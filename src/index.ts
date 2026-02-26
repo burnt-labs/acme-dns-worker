@@ -35,7 +35,7 @@ app.doc("/openapi.json", {
     version: "1.0.0",
     description:
       "Cloudflare Worker providing an acme-dns–compatible API for managing " +
-      "ACME DNS-01 challenge TXT records on Burnt Network domains.",
+      "ACME DNS-01 challenge TXT records via the Cloudflare DNS API.",
   },
   security: [{ ApiKeyAuth: [] }],
 });

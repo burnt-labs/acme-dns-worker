@@ -3,20 +3,20 @@
 # lego exec hook for acme-dns-worker
 #
 # Usage:
-#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_URL="https://acme-dns.example.com"
 #   export ACME_DNS_WORKER_API_KEY="your-api-key"
 #
 #   lego --dns exec \
 #     --exec.path ./lego-hook.sh \
-#     --domains rpc.xion-testnet-2.burnt.com \
+#     --domains app.example.com \
 #     --email you@example.com \
 #     run
 #
 # lego sets these env vars:
 #   EXEC_MODE        — "present" or "cleanup"
-#   EXEC_FQDN        — e.g. "_acme-challenge.rpc.xion-testnet-2.burnt.com."
+#   EXEC_FQDN        — e.g. "_acme-challenge.app.example.com."
 #   EXEC_VALUE       — the challenge token
-#   EXEC_DOMAIN      — e.g. "rpc.xion-testnet-2.burnt.com"
+#   EXEC_DOMAIN      — e.g. "app.example.com"
 # ------------------------------------------------------------------
 
 set -euo pipefail

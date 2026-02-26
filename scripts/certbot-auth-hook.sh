@@ -3,7 +3,7 @@
 # certbot manual hook scripts for acme-dns-worker
 #
 # Usage:
-#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_URL="https://acme-dns.example.com"
 #   export ACME_DNS_WORKER_API_KEY="your-api-key"
 #
 #   certbot certonly \
@@ -11,8 +11,8 @@
 #     --preferred-challenges dns \
 #     --manual-auth-hook ./certbot-auth-hook.sh \
 #     --manual-cleanup-hook ./certbot-cleanup-hook.sh \
-#     -d rpc.xion-testnet-2.burnt.com \
-#     -d api.xion-testnet-2.burnt.com
+#     -d app.example.com \
+#     -d api.example.com
 #
 # certbot sets these env vars for the hook:
 #   CERTBOT_DOMAIN    — the domain being validated

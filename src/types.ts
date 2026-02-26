@@ -8,7 +8,7 @@ export const UpdateRequestSchema = z.object({
   subdomain: z
     .string()
     .min(1, "subdomain is required")
-    .describe("FQDN to set the challenge on, e.g. rpc.xion-testnet-2.burnt.com")
+    .describe("FQDN to set the challenge on, e.g. app.example.com")
     .transform((v) => v.toLowerCase()),
   txt: z
     .string()

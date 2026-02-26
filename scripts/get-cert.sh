@@ -4,10 +4,10 @@
 #
 # Prerequisites:
 #   - certbot installed
-#   - API key from Burnt Network
+#   - API key from the worker operator
 #
 # Usage:
-#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_URL="https://acme-dns.example.com"
 #   export ACME_DNS_WORKER_API_KEY="your-api-key"
 #   ./get-cert.sh
 #   ./get-cert.sh --work-dir ./tmp   # run without root
@@ -23,8 +23,8 @@ CERTBOT_DIR="${SCRIPT_DIR}/.certbot"
 
 # Domains to get a cert for (edit as needed)
 DOMAINS=(
-  "rpc.xion-testnet-2.burnt.com"
-  "api.xion-testnet-2.burnt.com"
+  "app.example.com"
+  "api.example.com"
 )
 
 DOMAIN_ARGS=""

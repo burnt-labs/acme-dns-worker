@@ -3,17 +3,17 @@
 # acme.sh DNS hook for acme-dns-worker
 #
 # Usage:
-#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_URL="https://acme-dns.example.com"
 #   export ACME_DNS_WORKER_API_KEY="your-api-key"
 #
 #   acme.sh --issue \
-#     -d rpc.xion-testnet-2.burnt.com \
+#     -d app.example.com \
 #     --dns dns_acme_dns_worker
 #
 # Or for multiple domains:
 #   acme.sh --issue \
-#     -d rpc.xion-testnet-2.burnt.com \
-#     -d api.xion-testnet-2.burnt.com \
+#     -d app.example.com \
+#     -d api.example.com \
 #     --dns dns_acme_dns_worker
 # ------------------------------------------------------------------
 

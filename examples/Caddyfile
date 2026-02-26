@@ -22,12 +22,12 @@
 
 # Create credentials.json:
 # {
-#   "rpc.xion-testnet-2.burnt.com": {
+#   "app.example.com": {
 #     "username": "unused",
 #     "password": "YOUR-API-KEY-HERE",
-#     "fulldomain": "rpc.xion-testnet-2.burnt.com",
-#     "subdomain": "rpc.xion-testnet-2.burnt.com",
-#     "server_url": "https://acme-dns.burnt.com"
+#     "fulldomain": "app.example.com",
+#     "subdomain": "app.example.com",
+#     "server_url": "https://acme-dns.example.com"
 #   }
 # }
 #
@@ -43,7 +43,7 @@
 
 # Caddyfile:
 # {
-#   acme_dns https://acme-dns.burnt.com {
+#   acme_dns https://acme-dns.example.com {
 #     # Not directly supported — use the exec approach below
 #   }
 # }
@@ -56,44 +56,32 @@
 # Recommended: Let certbot/lego manage certs, Caddy uses them
 # ------------------------------------------------------------------
 
-rpc.xion-testnet-2.burnt.com {
-	tls /etc/certs/rpc.xion-testnet-2.burnt.com/fullchain.pem /etc/certs/rpc.xion-testnet-2.burnt.com/privkey.pem
+app.example.com {
+	tls /etc/certs/app.example.com/fullchain.pem /etc/certs/app.example.com/privkey.pem
 
-	reverse_proxy localhost:26657
+	reverse_proxy localhost:8080
 }
 
-api.xion-testnet-2.burnt.com {
-	tls /etc/certs/api.xion-testnet-2.burnt.com/fullchain.pem /etc/certs/api.xion-testnet-2.burnt.com/privkey.pem
+api.example.com {
+	tls /etc/certs/api.example.com/fullchain.pem /etc/certs/api.example.com/privkey.pem
 
-	reverse_proxy localhost:1317
-}
-
-rpc.xion-mainnet-1.burnt.com {
-	tls /etc/certs/rpc.xion-mainnet-1.burnt.com/fullchain.pem /etc/certs/rpc.xion-mainnet-1.burnt.com/privkey.pem
-
-	reverse_proxy localhost:26657
-}
-
-api.xion-mainnet-1.burnt.com {
-	tls /etc/certs/api.xion-mainnet-1.burnt.com/fullchain.pem /etc/certs/api.xion-mainnet-1.burnt.com/privkey.pem
-
-	reverse_proxy localhost:1317
+	reverse_proxy localhost:8081
 }
 
 # ------------------------------------------------------------------
 # Cert renewal cron (run alongside Caddy):
 #
-#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_URL="https://acme-dns.example.com"
 #   export ACME_DNS_WORKER_API_KEY="your-api-key"
 #
-#   # Every 60 days:
+#   # Daily (certbot only renews when within 30 days of expiry):
 #   certbot certonly \
 #     --manual \
 #     --preferred-challenges dns \
 #     --manual-auth-hook /path/to/certbot-auth-hook.sh \
 #     --manual-cleanup-hook /path/to/certbot-cleanup-hook.sh \
-#     -d rpc.xion-testnet-2.burnt.com \
-#     -d api.xion-testnet-2.burnt.com \
+#     -d app.example.com \
+#     -d api.example.com \
 #     --cert-path /etc/certs/ \
 #     --deploy-hook "caddy reload"
 # ------------------------------------------------------------------

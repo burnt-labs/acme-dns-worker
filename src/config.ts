@@ -1,11 +1,3 @@
-/** Domains that third parties may request ACME challenges for. */
-export const DEFAULT_ALLOWED_DOMAINS = [
-  "rpc.xion-testnet-2.burnt.com",
-  "api.xion-testnet-2.burnt.com",
-  "rpc.xion-mainnet-1.burnt.com",
-  "api.xion-mainnet-1.burnt.com",
-] as const;
-
 /** Parse the comma-separated ALLOWED_DOMAINS env var into a Set. */
 export function parseAllowedDomains(raw: string): Set<string> {
   return new Set(

@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://acme-dns.burnt.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,9 +37,15 @@ jobs:
           command: deploy --env production
           packageManager: pnpm
       - name: Verify deployment
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL }}
         run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "HEALTH_URL not set, skipping health check"
+            exit 0
+          fi
           sleep 10
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://acme-dns.burnt.com/health)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed: HTTP $STATUS"
             exit 1

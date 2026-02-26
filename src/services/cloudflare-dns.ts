@@ -23,7 +23,7 @@ export class CloudflareDnsService {
   }
 
   /**
-   * List TXT records matching an exact name (e.g. `_acme-challenge.rpc.xion-testnet-2.burnt.com`).
+   * List TXT records matching an exact name (e.g. `_acme-challenge.app.example.com`).
    */
   async listTxtRecords(name: string): Promise<CfDnsRecord[]> {
     const params = new URLSearchParams({ type: "TXT", name });
