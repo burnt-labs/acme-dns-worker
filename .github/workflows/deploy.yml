@@ -34,7 +34,7 @@ jobs:
         with:
           apiToken: ${{ secrets.BURNT_CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.BURNT_CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production
+          command: deploy 
           packageManager: pnpm
       - name: Verify deployment
         env:
