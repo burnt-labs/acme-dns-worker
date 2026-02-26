@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "acme-dns-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "placement": { "mode": "smart" },
+
+  // Dev defaults — overridden per environment
+  "vars": {
+    "ALLOWED_DOMAINS": "rpc.xion-testnet-2.burnt.com,api.xion-testnet-2.burnt.com,rpc.xion-mainnet-1.burnt.com,api.xion-mainnet-1.burnt.com",
+    "CF_ZONE_ID": ""
+  },
+
+  // Secrets (set via `wrangler secret put`):
+  //   API_KEYS     — comma-separated list of valid API keys
+  //   CF_API_TOKEN  — Cloudflare API token with Zone.DNS edit permission for burnt.com
+
+  "env": {
+    "production": {
+      "name": "acme-dns-worker",
+      "routes": [
+        { "pattern": "acme-dns.burnt.com", "custom_domain": true }
+      ],
+      "vars": {
+        "ALLOWED_DOMAINS": "rpc.xion-testnet-2.burnt.com,api.xion-testnet-2.burnt.com,rpc.xion-mainnet-1.burnt.com,api.xion-mainnet-1.burnt.com"
+      }
+    }
+  }
+}

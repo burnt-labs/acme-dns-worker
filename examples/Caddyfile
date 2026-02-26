@@ -1,0 +1,99 @@
+# ------------------------------------------------------------------
+# Caddyfile example using acme-dns-worker for TLS certificates
+#
+# Caddy natively supports the DNS-01 challenge via the caddy-dns plugin
+# ecosystem. Since acme-dns-worker exposes a simple HTTP API, we use
+# the `caddy-exec` DNS module or a manual approach with a helper script.
+#
+# Option 1: Use caddy-dns/acmedns (built-in ACME-DNS support)
+# Option 2: Use the command solver with a shell script
+# ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# Option 1: caddy-dns/acmedns plugin
+#
+# Build Caddy with the acmedns plugin:
+#   xcaddy build --with github.com/caddy-dns/acmedns
+#
+# This plugin speaks the standard acme-dns protocol, but since our
+# worker doesn't use /register (pre-shared keys), you provide a
+# static credentials file instead.
+# ------------------------------------------------------------------
+
+# Create credentials.json:
+# {
+#   "rpc.xion-testnet-2.burnt.com": {
+#     "username": "unused",
+#     "password": "YOUR-API-KEY-HERE",
+#     "fulldomain": "rpc.xion-testnet-2.burnt.com",
+#     "subdomain": "rpc.xion-testnet-2.burnt.com",
+#     "server_url": "https://acme-dns.burnt.com"
+#   }
+# }
+#
+# NOTE: Our worker uses X-Api-Key instead of X-Api-User/X-Api-Key,
+# so Option 2 below is the recommended approach.
+
+# ------------------------------------------------------------------
+# Option 2 (Recommended): Command DNS solver with helper script
+#
+# This works with stock Caddy — no plugins needed.
+# Uses the global ACME DNS solver with an external command.
+# ------------------------------------------------------------------
+
+# Caddyfile:
+# {
+#   acme_dns https://acme-dns.burnt.com {
+#     # Not directly supported — use the exec approach below
+#   }
+# }
+
+# Since Caddy doesn't have a built-in "exec" DNS solver, the simplest
+# approach is to use Caddy's `on_demand_tls` with certbot or lego
+# running as a sidecar/cron, then point Caddy at the cert files.
+
+# ------------------------------------------------------------------
+# Recommended: Let certbot/lego manage certs, Caddy uses them
+# ------------------------------------------------------------------
+
+rpc.xion-testnet-2.burnt.com {
+	tls /etc/certs/rpc.xion-testnet-2.burnt.com/fullchain.pem /etc/certs/rpc.xion-testnet-2.burnt.com/privkey.pem
+
+	reverse_proxy localhost:26657
+}
+
+api.xion-testnet-2.burnt.com {
+	tls /etc/certs/api.xion-testnet-2.burnt.com/fullchain.pem /etc/certs/api.xion-testnet-2.burnt.com/privkey.pem
+
+	reverse_proxy localhost:1317
+}
+
+rpc.xion-mainnet-1.burnt.com {
+	tls /etc/certs/rpc.xion-mainnet-1.burnt.com/fullchain.pem /etc/certs/rpc.xion-mainnet-1.burnt.com/privkey.pem
+
+	reverse_proxy localhost:26657
+}
+
+api.xion-mainnet-1.burnt.com {
+	tls /etc/certs/api.xion-mainnet-1.burnt.com/fullchain.pem /etc/certs/api.xion-mainnet-1.burnt.com/privkey.pem
+
+	reverse_proxy localhost:1317
+}
+
+# ------------------------------------------------------------------
+# Cert renewal cron (run alongside Caddy):
+#
+#   export ACME_DNS_WORKER_URL="https://acme-dns.burnt.com"
+#   export ACME_DNS_WORKER_API_KEY="your-api-key"
+#
+#   # Every 60 days:
+#   certbot certonly \
+#     --manual \
+#     --preferred-challenges dns \
+#     --manual-auth-hook /path/to/certbot-auth-hook.sh \
+#     --manual-cleanup-hook /path/to/certbot-cleanup-hook.sh \
+#     -d rpc.xion-testnet-2.burnt.com \
+#     -d api.xion-testnet-2.burnt.com \
+#     --cert-path /etc/certs/ \
+#     --deploy-hook "caddy reload"
+# ------------------------------------------------------------------
