@@ -16,7 +16,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CERTBOT_DIR="${SCRIPT_DIR}/.certbot"
+CERTBOT_DIR="${CERTBOT_DIR:-${SCRIPT_DIR}/.certbot}"
 
 : "${ACME_DNS_WORKER_URL:?Set ACME_DNS_WORKER_URL}"
 : "${ACME_DNS_WORKER_API_KEY:?Set ACME_DNS_WORKER_API_KEY}"
@@ -47,4 +47,4 @@ certbot certonly \
   --non-interactive \
   "$@"
 
-echo "Done! Certificates are in /etc/letsencrypt/live/"
+echo "Done! Certificates are in ${CERTBOT_DIR}/config/live/"
