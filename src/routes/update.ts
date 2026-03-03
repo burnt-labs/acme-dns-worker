@@ -22,7 +22,8 @@ const updateRoute = createRoute({
   summary: "Update ACME DNS-01 challenge TXT record",
   description:
     "Sets a `_acme-challenge.<subdomain>` TXT record via the Cloudflare DNS API. " +
-    "Supports up to 2 concurrent TXT records per domain for wildcard + base domain validation.",
+    "Records are scoped per-vendor so multiple vendors can manage the same domain. " +
+    "Each vendor may hold up to `maxRecords` concurrent TXT records per domain.",
   security: [{ ApiKeyAuth: [] }],
   request: {
     body: {
@@ -88,8 +89,9 @@ updateRoutes.openapi(updateRoute, async (c) => {
   // --- check vendor domain allow-list ----------------------------------------
   const vendorConfig = c.get("vendor");
   const vendor = vendorConfig?.name ?? "unknown";
+  const maxRecords = vendorConfig?.domains[subdomain];
 
-  if (!vendorConfig?.domains.includes(subdomain)) {
+  if (maxRecords === undefined) {
     return c.json({ error: `Domain "${subdomain}" is not in the allow-list` }, 403);
   }
 
@@ -97,7 +99,7 @@ updateRoutes.openapi(updateRoute, async (c) => {
   const dns = new CloudflareDnsService(c.env.CF_ZONE_ID, c.env.CF_API_TOKEN);
 
   try {
-    await dns.upsertAcmeChallenge(subdomain, txt);
+    await dns.upsertAcmeChallenge(subdomain, txt, vendor, maxRecords);
   } catch (err) {
     console.error(`Cloudflare DNS API error (vendor=${vendor}):`, err);
     return c.json({ error: "Failed to update DNS record" }, 502);

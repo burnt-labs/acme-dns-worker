@@ -4,19 +4,19 @@ import { parseApiKeys } from "../src/config.js";
 describe("parseApiKeys", () => {
   it("parses JSON key→vendor-config map", () => {
     const result = parseApiKeys(
-      '{"key1":{"name":"acme-corp","domains":["a.example.com"]},"key2":{"name":"widgets-inc","domains":["b.example.com"]}}',
+      '{"key1":{"name":"acme-corp","domains":{"a.example.com":2}},"key2":{"name":"widgets-inc","domains":{"b.example.com":3}}}',
     );
     expect(result).toEqual({
-      key1: { name: "acme-corp", domains: ["a.example.com"] },
-      key2: { name: "widgets-inc", domains: ["b.example.com"] },
+      key1: { name: "acme-corp", domains: { "a.example.com": 2 } },
+      key2: { name: "widgets-inc", domains: { "b.example.com": 3 } },
     });
   });
 
-  it("lowercases and trims domains", () => {
+  it("lowercases and trims domain keys", () => {
     const result = parseApiKeys(
-      '{"key1":{"name":"v","domains":[" FOO.COM ","Bar.Com"]}}',
+      '{"key1":{"name":"v","domains":{" FOO.COM ":2,"Bar.Com":3}}}',
     );
-    expect(result.key1.domains).toEqual(["foo.com", "bar.com"]);
+    expect(result.key1.domains).toEqual({ "foo.com": 2, "bar.com": 3 });
   });
 
   it("throws on non-JSON input", () => {
@@ -38,14 +38,29 @@ describe("parseApiKeys", () => {
   });
 
   it("throws when name is missing", () => {
-    expect(() => parseApiKeys('{"key1":{"domains":["a.com"]}}')).toThrow(
+    expect(() => parseApiKeys('{"key1":{"domains":{"a.com":2}}}')).toThrow(
       /name must be a non-empty string/,
     );
   });
 
-  it("throws when domains is not an array", () => {
+  it("throws when domains is not an object", () => {
     expect(() => parseApiKeys('{"key1":{"name":"v","domains":"a.com"}}')).toThrow(
-      /domains must be an array/,
+      /must be an object mapping/,
+    );
+  });
+
+  it("throws when domains is an array", () => {
+    expect(() => parseApiKeys('{"key1":{"name":"v","domains":["a.com"]}}')).toThrow(
+      /must be an object mapping/,
+    );
+  });
+
+  it("throws when maxRecords value is not a positive integer", () => {
+    expect(() => parseApiKeys('{"key1":{"name":"v","domains":{"a.com":0}}}')).toThrow(
+      /must be a positive integer/,
+    );
+    expect(() => parseApiKeys('{"key1":{"name":"v","domains":{"a.com":"two"}}}')).toThrow(
+      /must be a positive integer/,
     );
   });
 });

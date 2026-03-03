@@ -59,60 +59,78 @@ describe("CloudflareDnsService", () => {
       // First call: list → empty
       mockFetch.mockResolvedValueOnce(cfOkList([]));
       // Second call: create
-      const created = { id: "new-1", type: "TXT", name: "_acme-challenge.test.com", content: "tok", ttl: 120 };
+      const created = { id: "new-1", type: "TXT", name: "_acme-challenge.test.com", content: "tok", ttl: 120, comment: "acme-dns:vendor=test-vendor" };
       mockFetch.mockResolvedValueOnce(cfOk(created));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "tok");
+      const result = await dns.upsertAcmeChallenge("test.com", "tok", "test-vendor");
 
       expect(result).toEqual(created);
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      // Verify the POST body
+      // Verify the POST body includes comment
       const createCall = mockFetch.mock.calls[1];
       expect(createCall[1].method).toBe("POST");
       const body = JSON.parse(createCall[1].body);
       expect(body.type).toBe("TXT");
       expect(body.name).toBe("_acme-challenge.test.com");
       expect(body.content).toBe("tok");
+      expect(body.comment).toBe("acme-dns:vendor=test-vendor");
     });
 
-    it("creates a second record when only one exists", async () => {
+    it("creates a second record when under maxRecords", async () => {
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "old", ttl: 120 },
+        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "old", ttl: 120, comment: "acme-dns:vendor=test-vendor" },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
-      const created = { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "new", ttl: 120 };
+      const created = { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "new", ttl: 120, comment: "acme-dns:vendor=test-vendor" };
       mockFetch.mockResolvedValueOnce(cfOk(created));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "new");
+      const result = await dns.upsertAcmeChallenge("test.com", "new", "test-vendor");
 
       expect(result).toEqual(created);
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockFetch.mock.calls[1][1].method).toBe("POST");
     });
 
-    it("returns existing record when value already matches (1 record)", async () => {
+    it("only considers records tagged with the same vendor", async () => {
+      // Two records exist but belong to different vendors
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "same", ttl: 120 },
+        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "other", ttl: 120, comment: "acme-dns:vendor=other-vendor" },
+        { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "other2", ttl: 120, comment: "acme-dns:vendor=other-vendor" },
+      ];
+      mockFetch.mockResolvedValueOnce(cfOkList(existing));
+      const created = { id: "r3", type: "TXT", name: "_acme-challenge.test.com", content: "tok", ttl: 120, comment: "acme-dns:vendor=test-vendor" };
+      mockFetch.mockResolvedValueOnce(cfOk(created));
+
+      const result = await dns.upsertAcmeChallenge("test.com", "tok", "test-vendor");
+
+      expect(result).toEqual(created);
+      // Should create, not update, since no records belong to test-vendor
+      expect(mockFetch.mock.calls[1][1].method).toBe("POST");
+    });
+
+    it("returns existing record when value already matches", async () => {
+      const existing = [
+        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "same", ttl: 120, comment: "acme-dns:vendor=test-vendor" },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "same");
+      const result = await dns.upsertAcmeChallenge("test.com", "same", "test-vendor");
 
       expect(result).toEqual(existing[0]);
       // Only the list call was made
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("updates the differing record when 2 exist", async () => {
+    it("updates the oldest record when at maxRecords capacity", async () => {
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "val-a", ttl: 120 },
-        { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "val-b", ttl: 120 },
+        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "val-a", ttl: 120, comment: "acme-dns:vendor=test-vendor" },
+        { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "val-b", ttl: 120, comment: "acme-dns:vendor=test-vendor" },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
       const updated = { ...existing[0], content: "new-val" };
       mockFetch.mockResolvedValueOnce(cfOk(updated));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "new-val");
+      const result = await dns.upsertAcmeChallenge("test.com", "new-val", "test-vendor", 2);
 
       expect(result).toEqual(updated);
       // Should have PUT to r1 (first non-matching record)

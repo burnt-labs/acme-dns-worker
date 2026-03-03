@@ -54,13 +54,16 @@ export class CloudflareDnsService {
     name: string,
     content: string,
     ttl = 120,
+    comment?: string,
   ): Promise<CfDnsRecord> {
     const url = `${CF_API_BASE}/zones/${this.zoneId}/dns_records`;
+    const payload: Record<string, unknown> = { type: "TXT", name, content, ttl };
+    if (comment) payload.comment = comment;
 
     const res = await fetch(url, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({ type: "TXT", name, content, ttl }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -88,13 +91,16 @@ export class CloudflareDnsService {
     name: string,
     content: string,
     ttl = 120,
+    comment?: string,
   ): Promise<CfDnsRecord> {
     const url = `${CF_API_BASE}/zones/${this.zoneId}/dns_records/${recordId}`;
+    const payload: Record<string, unknown> = { type: "TXT", name, content, ttl };
+    if (comment) payload.comment = comment;
 
     const res = await fetch(url, {
       method: "PUT",
       headers: this.headers(),
-      body: JSON.stringify({ type: "TXT", name, content, ttl }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -134,36 +140,45 @@ export class CloudflareDnsService {
   }
 
   /**
-   * Upsert a TXT record for an ACME challenge.
+   * Upsert a TXT record for an ACME challenge, scoped to a specific vendor.
    *
-   * Follows acme-dns semantics: keeps up to 2 TXT records for the same name
-   * to support simultaneous base + wildcard validation. If there are already 2,
-   * the oldest one is replaced.
+   * Records are tagged with a comment (`acme-dns:vendor=<name>`) so that
+   * multiple vendors can manage TXT records for the same domain without
+   * interfering with each other.
+   *
+   * Each vendor may hold up to `maxRecords` TXT records per challenge name
+   * (default 2 — enough for simultaneous base + wildcard validation).
    */
-  async upsertAcmeChallenge(domain: string, txt: string): Promise<CfDnsRecord> {
+  async upsertAcmeChallenge(
+    domain: string,
+    txt: string,
+    vendor: string,
+    maxRecords = 2,
+  ): Promise<CfDnsRecord> {
     const name = `_acme-challenge.${domain}`;
+    const tag = `acme-dns:vendor=${vendor}`;
 
-    const existing = await this.listTxtRecords(name);
+    // Fetch all TXT records for this challenge name, then filter to this vendor
+    const allRecords = await this.listTxtRecords(name);
+    const vendorRecords = allRecords.filter((r) => r.comment === tag);
 
-    if (existing.length === 0) {
-      // No records yet — create one
-      return this.createTxtRecord(name, txt);
+    if (vendorRecords.length === 0) {
+      return this.createTxtRecord(name, txt, 120, tag);
     }
 
-    if (existing.length === 1) {
-      if (existing[0].content === txt) {
-        // Already set to the same value
-        return existing[0];
-      }
-      // Create a second record (for wildcard + base domain support)
-      return this.createTxtRecord(name, txt);
+    // Already set to the same value — no-op
+    const duplicate = vendorRecords.find((r) => r.content === txt);
+    if (duplicate) {
+      return duplicate;
     }
 
-    // 2+ records exist — replace the oldest (first in list, assuming default ordering)
-    // or find one that's not equal to the new value
-    const target =
-      existing.find((r) => r.content !== txt) ?? existing[0];
+    if (vendorRecords.length < maxRecords) {
+      // Still have room — create another record
+      return this.createTxtRecord(name, txt, 120, tag);
+    }
 
-    return this.updateTxtRecord(target.id, name, txt);
+    // At capacity — replace the oldest (first) non-matching record
+    const target = vendorRecords.find((r) => r.content !== txt) ?? vendorRecords[0];
+    return this.updateTxtRecord(target.id, name, txt, 120, tag);
   }
 }

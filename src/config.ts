@@ -1,9 +1,13 @@
+/** Default max TXT records a vendor may hold per challenge name. */
+export const DEFAULT_MAX_RECORDS = 2;
+
 /**
  * Vendor configuration attached to an API key.
  */
 export interface VendorConfig {
   name: string;
-  domains: string[];
+  /** Map of domain → max concurrent TXT records for that domain. */
+  domains: Record<string, number>;
 }
 
 /**
@@ -11,8 +15,10 @@ export interface VendorConfig {
  * Stored as a JSON secret:
  * ```json
  * {
- *   "<api-key>": { "name": "<vendor>", "domains": ["a.example.com", ...] },
- *   ...
+ *   "<api-key>": {
+ *     "name": "<vendor>",
+ *     "domains": { "rpc.example.com": 4, "api.example.com": 2 }
+ *   }
  * }
  * ```
  */
@@ -39,11 +45,20 @@ export function parseApiKeys(raw: string): ApiKeyMap {
     if (typeof v.name !== "string" || !v.name) {
       throw new Error(`API_KEYS["${key}"].name must be a non-empty string`);
     }
-    if (!Array.isArray(v.domains) || !v.domains.every((d) => typeof d === "string")) {
-      throw new Error(`API_KEYS["${key}"].domains must be an array of strings`);
+    if (typeof v.domains !== "object" || v.domains === null || Array.isArray(v.domains)) {
+      throw new Error(`API_KEYS["${key}"].domains must be an object mapping domain names to maxRecords`);
     }
-    // Normalise domains to lowercase
-    v.domains = (v.domains as string[]).map((d) => d.trim().toLowerCase());
+    // Normalise domain keys to lowercase and validate maxRecords values
+    const normalized: Record<string, number> = {};
+    for (const [domain, max] of Object.entries(v.domains as Record<string, unknown>)) {
+      const d = domain.trim().toLowerCase();
+      if (!d) continue;
+      if (typeof max !== "number" || !Number.isInteger(max) || max < 1) {
+        throw new Error(`API_KEYS["${key}"].domains["${domain}"] must be a positive integer (maxRecords)`);
+      }
+      normalized[d] = max;
+    }
+    v.domains = normalized;
   }
 
   return map as unknown as ApiKeyMap;

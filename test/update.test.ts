@@ -24,16 +24,16 @@ function buildApp() {
       API_KEYS: JSON.stringify({
         "test-key-1": {
           name: "vendor-alpha",
-          domains: [
-            "rpc.xion-testnet-2.burnt.com",
-            "api.xion-testnet-2.burnt.com",
-            "rpc.xion-mainnet-1.burnt.com",
-            "api.xion-mainnet-1.burnt.com",
-          ],
+          domains: {
+            "rpc.xion-testnet-2.burnt.com": 2,
+            "api.xion-testnet-2.burnt.com": 2,
+            "rpc.xion-mainnet-1.burnt.com": 2,
+            "api.xion-mainnet-1.burnt.com": 2,
+          },
         },
         "test-key-2": {
           name: "vendor-beta",
-          domains: ["beta.example.com"],
+          domains: { "beta.example.com": 3 },
         },
       }),
       CF_API_TOKEN: "fake-token",
@@ -146,6 +146,8 @@ describe("POST /update", () => {
     expect(mockUpsertAcmeChallenge).toHaveBeenCalledWith(
       "rpc.xion-testnet-2.burnt.com",
       "LHDhK3oGRvkiefQnx7OOczTY5Tic_xZ6HcMOc_gmtoM",
+      "vendor-alpha",
+      2,
     );
   });
 

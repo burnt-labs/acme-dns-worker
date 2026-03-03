@@ -42,6 +42,8 @@ export interface CfDnsRecord {
   name: string;
   content: string;
   ttl: number;
+  /** Free-form comment used to tag records with vendor ownership. */
+  comment?: string;
 }
 
 /** Cloudflare API list response wrapper. */
