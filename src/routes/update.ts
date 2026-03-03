@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { parseAllowedDomains } from "../config.js";
+import type { VendorConfig } from "../config.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { CloudflareDnsService } from "../services/cloudflare-dns.js";
 import {
@@ -11,7 +11,7 @@ import {
 type UpdateEnv = {
   Bindings: Cloudflare.Env;
   Variables: {
-    vendor: string;
+    vendor: VendorConfig;
   };
 };
 
@@ -85,15 +85,15 @@ updateRoutes.use("/update", authMiddleware);
 updateRoutes.openapi(updateRoute, async (c) => {
   const { subdomain, txt } = c.req.valid("json");
 
-  // --- check domain allow-list -----------------------------------------------
-  const allowed = parseAllowedDomains(c.env.ALLOWED_DOMAINS);
+  // --- check vendor domain allow-list ----------------------------------------
+  const vendorConfig = c.get("vendor");
+  const vendor = vendorConfig?.name ?? "unknown";
 
-  if (!allowed.has(subdomain)) {
+  if (!vendorConfig?.domains.includes(subdomain)) {
     return c.json({ error: `Domain "${subdomain}" is not in the allow-list` }, 403);
   }
 
   // --- upsert TXT record via Cloudflare API ----------------------------------
-  const vendor = c.get("vendor") ?? "unknown";
   const dns = new CloudflareDnsService(c.env.CF_ZONE_ID, c.env.CF_API_TOKEN);
 
   try {

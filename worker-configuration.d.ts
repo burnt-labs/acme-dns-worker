@@ -9,7 +9,6 @@ declare namespace Cloudflare {
 		API_KEYS: string;
 		CF_API_TOKEN: string;
 		CF_ZONE_ID: string;
-		ALLOWED_DOMAINS: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
@@ -17,7 +16,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "API_KEYS" | "CF_API_TOKEN" | "CF_ZONE_ID" | "ALLOWED_DOMAINS">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "API_KEYS" | "CF_API_TOKEN" | "CF_ZONE_ID">> {}
 }
 
 // Begin runtime types

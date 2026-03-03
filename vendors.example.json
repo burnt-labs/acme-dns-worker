@@ -1,0 +1,9 @@
+{
+  "YOUR-UUID-HERE": {
+    "name": "vendor-name",
+    "domains": [
+      "rpc.example.com",
+      "api.example.com"
+    ]
+  }
+}

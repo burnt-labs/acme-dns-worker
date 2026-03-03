@@ -13,7 +13,6 @@
 
   // Secrets (set via `wrangler secret put`):
   //   CF_ZONE_ID       — Cloudflare Zone ID for the domain(s) being managed
-  //   API_KEYS         — JSON map of API keys to vendor names
+  //   API_KEYS         — JSON map of API keys to { name, domains[] } vendor configs
   //   CF_API_TOKEN     — Cloudflare API token with Zone.DNS edit permission
-  //   ALLOWED_DOMAINS  — Comma-separated list of domains vendors may request certs for
 }
