@@ -22,13 +22,22 @@ function buildApp() {
   app.use("*", async (c, next) => {
     c.env = {
       API_KEYS: JSON.stringify({
-        "test-key-1": "vendor-alpha",
-        "test-key-2": "vendor-beta",
+        "test-key-1": {
+          name: "vendor-alpha",
+          domains: [
+            "rpc.xion-testnet-2.burnt.com",
+            "api.xion-testnet-2.burnt.com",
+            "rpc.xion-mainnet-1.burnt.com",
+            "api.xion-mainnet-1.burnt.com",
+          ],
+        },
+        "test-key-2": {
+          name: "vendor-beta",
+          domains: ["beta.example.com"],
+        },
       }),
       CF_API_TOKEN: "fake-token",
       CF_ZONE_ID: "fake-zone-id",
-      ALLOWED_DOMAINS:
-        "rpc.xion-testnet-2.burnt.com,api.xion-testnet-2.burnt.com,rpc.xion-mainnet-1.burnt.com,api.xion-mainnet-1.burnt.com",
     } satisfies Cloudflare.Env;
     await next();
   });

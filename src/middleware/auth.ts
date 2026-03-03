@@ -1,13 +1,13 @@
 import type { Context, Next } from "hono";
-import { parseApiKeys } from "../config.js";
+import { parseApiKeys, type VendorConfig } from "../config.js";
 
 /**
  * Middleware that validates the `X-Api-Key` header against configured keys.
- * On success, sets `c.set("vendor", vendorName)` for downstream handlers.
+ * On success, sets `c.set("vendor", vendorConfig)` for downstream handlers.
  * Returns 401 if the key is missing or invalid.
  */
 export async function authMiddleware(
-  c: Context<{ Bindings: Cloudflare.Env; Variables: { vendor: string } }>,
+  c: Context<{ Bindings: Cloudflare.Env; Variables: { vendor: VendorConfig } }>,
   next: Next,
 ): Promise<Response | void> {
   const apiKey = c.req.header("X-Api-Key");

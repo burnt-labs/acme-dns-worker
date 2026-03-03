@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "deploy:production": "wrangler deploy --env production",
+    "sync-vendors": "./scripts/sync-vendors.sh",
+    "deploy-vendors": "./scripts/sync-vendors.sh --deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "test": "vitest run",
     "test:watch": "vitest",

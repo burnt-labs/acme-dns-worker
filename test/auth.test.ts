@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { authMiddleware } from "../src/middleware/auth.js";
+import type { VendorConfig } from "../src/config.js";
 
-function buildApp(apiKeys: Record<string, string>) {
+function buildApp(apiKeys: Record<string, VendorConfig>) {
   const app = new Hono<{ Bindings: Cloudflare.Env }>();
 
   app.use("*", async (c, next) => {
@@ -19,7 +20,7 @@ function buildApp(apiKeys: Record<string, string>) {
 
 describe("authMiddleware", () => {
   it("returns 401 when X-Api-Key header is missing", async () => {
-    const app = buildApp({ "valid-key": "vendor-a" });
+    const app = buildApp({ "valid-key": { name: "vendor-a", domains: ["a.com"] } });
     const res = await app.request("/test", { method: "POST" });
     expect(res.status).toBe(401);
     const body = await res.json<{ error: string }>();
@@ -27,7 +28,7 @@ describe("authMiddleware", () => {
   });
 
   it("returns 401 for invalid API key", async () => {
-    const app = buildApp({ "valid-key": "vendor-a" });
+    const app = buildApp({ "valid-key": { name: "vendor-a", domains: ["a.com"] } });
     const res = await app.request("/test", {
       method: "POST",
       headers: { "X-Api-Key": "wrong-key" },
@@ -38,12 +39,18 @@ describe("authMiddleware", () => {
   });
 
   it("passes through for a valid API key and sets vendor", async () => {
-    const app = buildApp({ key1: "acme-corp", key2: "widgets-inc" });
+    const app = buildApp({
+      key1: { name: "acme-corp", domains: ["a.com"] },
+      key2: { name: "widgets-inc", domains: ["b.com"] },
+    });
     const res = await app.request("/test", {
       method: "POST",
       headers: { "X-Api-Key": "key2" },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, vendor: "widgets-inc" });
+    const body = await res.json<{ ok: boolean; vendor: { name: string; domains: string[] } }>();
+    expect(body.ok).toBe(true);
+    expect(body.vendor.name).toBe("widgets-inc");
+    expect(body.vendor.domains).toEqual(["b.com"]);
   });
 });
