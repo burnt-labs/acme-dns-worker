@@ -16,7 +16,14 @@ export async function authMiddleware(
     return c.json({ error: "Missing X-Api-Key header" }, 401);
   }
 
-  const keyMap = parseApiKeys(c.env.API_KEYS);
+  let keyMap;
+  try {
+    keyMap = parseApiKeys(c.env.API_KEYS);
+  } catch (err) {
+    console.error("Failed to parse API_KEYS:", err);
+    return c.json({ error: "Server configuration error" }, 500);
+  }
+
   const vendor = keyMap[apiKey];
 
   if (!vendor) {
