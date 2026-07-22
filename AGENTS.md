@@ -1,4 +1,4 @@
-# CLAUDE.md — acme-dns-worker
+# AGENTS.md — acme-dns-worker
 
 ## Project Overview
 

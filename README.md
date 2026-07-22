@@ -64,7 +64,7 @@ Edit `wrangler.jsonc`:
 ### 3. Set secrets
 
 ```sh
-# JSON map of API keys → vendor names
+# JSON map of API keys → vendor configs (name + allowed domains)
 wrangler secret put API_KEYS --env production
 
 # Cloudflare API token with Zone.DNS edit permission
@@ -72,15 +72,12 @@ wrangler secret put CF_API_TOKEN --env production
 
 # Cloudflare zone ID for the target domain
 wrangler secret put CF_ZONE_ID --env production
-
-# Comma-separated list of domains vendors can request certs for
-wrangler secret put ALLOWED_DOMAINS --env production
 ```
 
 ### 4. Deploy
 
 ```sh
-pnpm run deploy:production
+pnpm deploy
 ```
 
 ## Development
@@ -88,10 +85,9 @@ pnpm run deploy:production
 ```sh
 # Create .dev.vars with local secrets
 cat > .dev.vars <<'EOF'
-API_KEYS={"dev-key-1":"local-vendor"}
+API_KEYS={"dev-key-1":{"name":"local-vendor","domains":["app.example.com","api.example.com"]}}
 CF_API_TOKEN=your-cf-api-token
 CF_ZONE_ID=your-zone-id
-ALLOWED_DOMAINS=app.example.com,api.example.com
 EOF
 
 pnpm dev
