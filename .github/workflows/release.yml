@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   cloudflare:
-    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-release.yml@dc3c150483da96152a16d569ad735754033933cb # v1.1.0
+    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-release.yml@7bce4befc1db8a1eca8e530c53dd5e23ca3ec675 # v1.1.1
     with:
       release-tag: ${{ github.event.release.tag_name }}
       release-url: ${{ github.event.release.html_url }}
