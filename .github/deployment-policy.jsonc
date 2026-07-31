@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  // One Worker, no wrangler `env` block, nothing to promote between. Under
+  // `single` the candidate and the release are the same Worker and promotion
+  // splits by traffic: a merge to main uploads a version at 0%, and publishing
+  // a release deploys it. Targets name no wranglerEnv because there is no
+  // wrangler environment to name — the deploy omits `--env`.
+  "topology": "single",
+  "promotionMode": "manual",
+  "packageManager": "pnpm",
+  "workingDirectory": ".",
+  "versionFile": "package.json",
+  "targets": {
+    "candidate": {
+      "githubEnvironment": "production",
+      "url": "https://acme-dns.burnt.com",
+    },
+    "release": {
+      "githubEnvironment": "production",
+      "url": "https://acme-dns.burnt.com",
+    },
+  },
+}

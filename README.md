@@ -24,9 +24,9 @@ Set the ACME DNS-01 challenge TXT record for a domain.
 
 **Headers:**
 
-| Header      | Required | Description            |
-| ----------- | -------- | ---------------------- |
-| `X-Api-Key` | Yes      | Pre-shared API key     |
+| Header      | Required | Description        |
+| ----------- | -------- | ------------------ |
+| `X-Api-Key` | Yes      | Pre-shared API key |
 
 **Body (JSON):**
 
@@ -39,13 +39,13 @@ Set the ACME DNS-01 challenge TXT record for a domain.
 
 **Responses:**
 
-| Status | Description                    |
-| ------ | ------------------------------ |
-| 200    | TXT record updated             |
-| 400    | Invalid request body           |
-| 401    | Missing or invalid API key     |
-| 403    | Domain not in allow-list       |
-| 502    | Cloudflare DNS API error       |
+| Status | Description                |
+| ------ | -------------------------- |
+| 200    | TXT record updated         |
+| 400    | Invalid request body       |
+| 401    | Missing or invalid API key |
+| 403    | Domain not in allow-list   |
+| 502    | Cloudflare DNS API error   |
 
 ## Setup
 

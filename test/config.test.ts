@@ -44,8 +44,8 @@ describe("parseApiKeys", () => {
   });
 
   it("throws when domains is not an array", () => {
-    expect(() => parseApiKeys('{"key1":{"name":"v","domains":"a.com"}}')).toThrow(
-      /domains must be an array/,
-    );
+    expect(() =>
+      parseApiKeys('{"key1":{"name":"v","domains":"a.com"}}'),
+    ).toThrow(/domains must be an array/);
   });
 });

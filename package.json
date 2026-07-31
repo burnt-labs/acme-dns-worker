@@ -9,6 +9,12 @@
     "sync-vendors": "./scripts/sync-vendors.sh",
     "deploy-vendors": "./scripts/sync-vendors.sh --deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "type-check": "tsc --noEmit",
+    "build": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -22,8 +28,14 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.0",
     "@cloudflare/workers-types": "^4.20250214.0",
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-istanbul": "^3.2.7",
+    "eslint": "^10.8.0",
+    "globals": "^17.8.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "3.2.7",
     "wrangler": "^4.69.0"
   },
   "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"

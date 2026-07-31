@@ -1,0 +1,7 @@
+# Prettier does not read .gitignore, so without this the gate passes or fails
+# depending on whether build and coverage have already run in the checkout.
+dist/
+coverage/
+.wrangler/
+pnpm-lock.yaml
+worker-configuration.d.ts

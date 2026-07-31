@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import updateRoutes from "../src/routes/update.js";
 
@@ -139,9 +139,7 @@ describe("POST /update", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json<{ txt: string; vendor: string }>();
-    expect(body.txt).toBe(
-      "LHDhK3oGRvkiefQnx7OOczTY5Tic_xZ6HcMOc_gmtoM",
-    );
+    expect(body.txt).toBe("LHDhK3oGRvkiefQnx7OOczTY5Tic_xZ6HcMOc_gmtoM");
     expect(body.vendor).toBe("vendor-alpha");
     expect(mockUpsertAcmeChallenge).toHaveBeenCalledWith(
       "rpc.xion-testnet-2.burnt.com",
@@ -179,9 +177,7 @@ describe("POST /update", () => {
   });
 
   it("returns 502 when Cloudflare API fails", async () => {
-    mockUpsertAcmeChallenge.mockRejectedValue(
-      new Error("CF API error"),
-    );
+    mockUpsertAcmeChallenge.mockRejectedValue(new Error("CF API error"));
     const app = buildApp();
     const res = await postUpdate(app, {
       subdomain: "rpc.xion-testnet-2.burnt.com",
