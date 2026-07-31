@@ -1,0 +1,21 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches: [main]
+    # ready_for_review matters: draft pull requests skip the whole flow, so
+    # without it a draft marked ready would never run.
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  deployments: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  cloudflare:
+    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-pr.yml@dc3c150483da96152a16d569ad735754033933cb # v1.1.0
+    secrets:
+      cloudflare-account-id: ${{ secrets.BURNT_CLOUDFLARE_ACCOUNT_ID }}
+      cloudflare-api-token: ${{ secrets.BURNT_CLOUDFLARE_API_TOKEN }}

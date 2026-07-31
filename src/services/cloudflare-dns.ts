@@ -39,9 +39,7 @@ export class CloudflareDnsService {
 
     const body = (await res.json()) as CfApiListResponse<CfDnsRecord>;
     if (!body.success) {
-      throw new Error(
-        `Cloudflare API failure: ${JSON.stringify(body.errors)}`,
-      );
+      throw new Error(`Cloudflare API failure: ${JSON.stringify(body.errors)}`);
     }
 
     return body.result;
@@ -72,9 +70,7 @@ export class CloudflareDnsService {
 
     const body = (await res.json()) as CfApiResponse<CfDnsRecord>;
     if (!body.success) {
-      throw new Error(
-        `Cloudflare API failure: ${JSON.stringify(body.errors)}`,
-      );
+      throw new Error(`Cloudflare API failure: ${JSON.stringify(body.errors)}`);
     }
 
     return body.result;
@@ -106,9 +102,7 @@ export class CloudflareDnsService {
 
     const body = (await res.json()) as CfApiResponse<CfDnsRecord>;
     if (!body.success) {
-      throw new Error(
-        `Cloudflare API failure: ${JSON.stringify(body.errors)}`,
-      );
+      throw new Error(`Cloudflare API failure: ${JSON.stringify(body.errors)}`);
     }
 
     return body.result;
@@ -161,8 +155,7 @@ export class CloudflareDnsService {
 
     // 2+ records exist — replace the oldest (first in list, assuming default ordering)
     // or find one that's not equal to the new value
-    const target =
-      existing.find((r) => r.content !== txt) ?? existing[0];
+    const target = existing.find((r) => r.content !== txt) ?? existing[0];
 
     return this.updateTxtRecord(target.id, name, txt);
   }

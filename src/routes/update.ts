@@ -90,7 +90,10 @@ updateRoutes.openapi(updateRoute, async (c) => {
   const vendor = vendorConfig?.name ?? "unknown";
 
   if (!vendorConfig?.domains.includes(subdomain)) {
-    return c.json({ error: `Domain "${subdomain}" is not in the allow-list` }, 403);
+    return c.json(
+      { error: `Domain "${subdomain}" is not in the allow-list` },
+      403,
+    );
   }
 
   // --- upsert TXT record via Cloudflare API ----------------------------------

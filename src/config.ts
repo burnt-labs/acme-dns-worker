@@ -33,13 +33,18 @@ export function parseApiKeys(raw: string): ApiKeyMap {
   const map = parsed as Record<string, unknown>;
   for (const [key, value] of Object.entries(map)) {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      throw new Error(`API_KEYS["${key}"] must be an object with name and domains`);
+      throw new Error(
+        `API_KEYS["${key}"] must be an object with name and domains`,
+      );
     }
     const v = value as Record<string, unknown>;
     if (typeof v.name !== "string" || !v.name) {
       throw new Error(`API_KEYS["${key}"].name must be a non-empty string`);
     }
-    if (!Array.isArray(v.domains) || !v.domains.every((d) => typeof d === "string")) {
+    if (
+      !Array.isArray(v.domains) ||
+      !v.domains.every((d) => typeof d === "string")
+    ) {
       throw new Error(`API_KEYS["${key}"].domains must be an array of strings`);
     }
     // Normalise domains to lowercase

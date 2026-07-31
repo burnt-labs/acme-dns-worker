@@ -1,0 +1,16 @@
+name: Push to Main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  cloudflare:
+    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-main.yml@dc3c150483da96152a16d569ad735754033933cb # v1.1.0
+    secrets:
+      cloudflare-account-id: ${{ secrets.BURNT_CLOUDFLARE_ACCOUNT_ID }}
+      cloudflare-api-token: ${{ secrets.BURNT_CLOUDFLARE_API_TOKEN }}

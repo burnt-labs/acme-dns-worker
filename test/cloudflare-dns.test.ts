@@ -45,7 +45,13 @@ describe("CloudflareDnsService", () => {
 
     it("returns records from response", async () => {
       const records = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.example.com", content: "val1", ttl: 120 },
+        {
+          id: "r1",
+          type: "TXT",
+          name: "_acme-challenge.example.com",
+          content: "val1",
+          ttl: 120,
+        },
       ];
       mockFetch.mockResolvedValue(cfOkList(records));
 
@@ -59,7 +65,13 @@ describe("CloudflareDnsService", () => {
       // First call: list → empty
       mockFetch.mockResolvedValueOnce(cfOkList([]));
       // Second call: create
-      const created = { id: "new-1", type: "TXT", name: "_acme-challenge.test.com", content: "tok", ttl: 120 };
+      const created = {
+        id: "new-1",
+        type: "TXT",
+        name: "_acme-challenge.test.com",
+        content: "tok",
+        ttl: 120,
+      };
       mockFetch.mockResolvedValueOnce(cfOk(created));
 
       const result = await dns.upsertAcmeChallenge("test.com", "tok");
@@ -77,10 +89,22 @@ describe("CloudflareDnsService", () => {
 
     it("creates a second record when only one exists", async () => {
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "old", ttl: 120 },
+        {
+          id: "r1",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "old",
+          ttl: 120,
+        },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
-      const created = { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "new", ttl: 120 };
+      const created = {
+        id: "r2",
+        type: "TXT",
+        name: "_acme-challenge.test.com",
+        content: "new",
+        ttl: 120,
+      };
       mockFetch.mockResolvedValueOnce(cfOk(created));
 
       const result = await dns.upsertAcmeChallenge("test.com", "new");
@@ -92,7 +116,13 @@ describe("CloudflareDnsService", () => {
 
     it("returns existing record when value already matches (1 record)", async () => {
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "same", ttl: 120 },
+        {
+          id: "r1",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "same",
+          ttl: 120,
+        },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
 
@@ -105,8 +135,20 @@ describe("CloudflareDnsService", () => {
 
     it("updates the differing record when 2 exist", async () => {
       const existing = [
-        { id: "r1", type: "TXT", name: "_acme-challenge.test.com", content: "val-a", ttl: 120 },
-        { id: "r2", type: "TXT", name: "_acme-challenge.test.com", content: "val-b", ttl: 120 },
+        {
+          id: "r1",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "val-a",
+          ttl: 120,
+        },
+        {
+          id: "r2",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "val-b",
+          ttl: 120,
+        },
       ];
       mockFetch.mockResolvedValueOnce(cfOkList(existing));
       const updated = { ...existing[0], content: "new-val" };

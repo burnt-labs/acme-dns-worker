@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "workingDirectory": ".",
+  "commands": {
+    "install": "pnpm install --frozen-lockfile",
+    "lint": "pnpm run lint",
+    "prettier": "pnpm run format:check",
+    "typeCheck": "pnpm run type-check",
+    "test": "pnpm test",
+    "coverage": "pnpm run test:coverage",
+    "build": "pnpm run build",
+  },
+  // Enforced by vitest.config.ts, which must move in step with this file.
+  // Measured baseline at migration, not a target. Ratchet upward only.
+  //
+  // The coverage provider is istanbul, not v8: v8 imports node:inspector,
+  // which workerd does not have, so under @cloudflare/vitest-pool-workers it
+  // reported 0% lines while every test passed.
+  "coverageThresholds": {
+    "lines": 74,
+    "functions": 77,
+    "branches": 80,
+  },
+}

@@ -1,0 +1,14 @@
+# Keep the central workflow pins current. Each `uses:` is a full commit SHA
+# with a trailing version comment; Dependabot resolves the version from that
+# comment and opens a bump when burnt-labs/github-workflows cuts a release.
+# Without this file the pins never move, and a stale pin does not error — it
+# silently keeps running the old workflow.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
