@@ -1,15 +1,16 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+    }),
+  ],
   test: {
     globals: true,
     testTimeout: 10_000,
     include: ["test/**/*.test.ts"],
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
-      },
-    },
     coverage: {
       // istanbul, not v8. The v8 provider imports node:inspector, which does
       // not exist in workerd, so under @cloudflare/vitest-pool-workers it fails

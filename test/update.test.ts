@@ -8,9 +8,9 @@ import updateRoutes from "../src/routes/update.js";
 const mockUpsertAcmeChallenge = vi.fn();
 
 vi.mock("../src/services/cloudflare-dns.js", () => ({
-  CloudflareDnsService: vi.fn().mockImplementation(() => ({
-    upsertAcmeChallenge: mockUpsertAcmeChallenge,
-  })),
+  CloudflareDnsService: vi.fn().mockImplementation(function () {
+    return { upsertAcmeChallenge: mockUpsertAcmeChallenge };
+  }),
 }));
 
 // ---------------------------------------------------------------------------
