@@ -166,6 +166,15 @@ export class CloudflareDnsService {
         `Cloudflare API error deleting record: ${res.status} ${text}`,
       );
     }
+
+    // Cloudflare can answer 200 with a success:false envelope. Without this
+    // check a rejected delete looks like a successful one, and
+    // deleteAcmeChallenge would count a record as removed while it is still
+    // live - the stale accumulation this whole change exists to stop.
+    const body = (await res.json()) as CfApiResponse<CfDnsRecord>;
+    if (!body.success) {
+      throw new Error(`Cloudflare API failure: ${JSON.stringify(body.errors)}`);
+    }
   }
 
   /**

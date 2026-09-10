@@ -376,6 +376,27 @@ describe("CloudflareDnsService API failures", () => {
     );
   });
 
+  it("deleteTxtRecord throws when the API reports failure", async () => {
+    // Cloudflare answers 200 with success:false for some rejections. Treating
+    // that as a successful delete would let cleanup report a record removed
+    // while it is still live.
+    mockFetch.mockResolvedValueOnce(cfNotSuccess());
+    await expect(dns.deleteTxtRecord("r1")).rejects.toThrow(
+      /Authentication error/,
+    );
+  });
+
+  it("a rejected delete does not count toward the cleanup total", async () => {
+    mockFetch.mockResolvedValueOnce(
+      cfOkList([rec("r1", "alpha-token", ALPHA)]),
+    );
+    mockFetch.mockResolvedValueOnce(cfNotSuccess());
+
+    await expect(dns.deleteAcmeChallenge("test.com", "alpha")).rejects.toThrow(
+      /Authentication error/,
+    );
+  });
+
   it("a failed list aborts the upsert instead of creating a duplicate", async () => {
     // If listing fails and we pressed on, we would create a second record
     // while the vendor already owns one - the growth that caused DO-495.
