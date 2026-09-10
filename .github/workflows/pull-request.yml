@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   cloudflare:
-    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-pr.yml@dc9c30663c189d24c1346a3f96f1457e3bb526c6 # v1.3.4
+    uses: burnt-labs/github-workflows/.github/workflows/cloudflare-pr.yml@e80433becb3bfbd429ade0815c8e012912190205 # v1.4.1
     secrets:
       cloudflare-account-id: ${{ secrets.BURNT_CLOUDFLARE_ACCOUNT_ID }}
       cloudflare-api-token: ${{ secrets.BURNT_CLOUDFLARE_API_TOKEN }}
