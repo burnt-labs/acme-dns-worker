@@ -20,7 +20,7 @@ response=$(curl -s -w "\n%{http_code}" \
   -X POST "${ACME_DNS_WORKER_URL}/cleanup" \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: ${ACME_DNS_WORKER_API_KEY}" \
-  -d "{\"subdomain\": \"${CERTBOT_DOMAIN}\"}")
+  -d "{\"subdomain\": \"${CERTBOT_DOMAIN}\"}" || true)
 
 http_code=$(echo "$response" | tail -1)
 body=$(echo "$response" | head -1)
