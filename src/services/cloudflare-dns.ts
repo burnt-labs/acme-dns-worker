@@ -18,6 +18,16 @@ const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 const COMMENT_PREFIX = "acme-dns:vendor=";
 
 /**
+ * Concurrent challenge records allowed per vendor per challenge name.
+ *
+ * Issuing a certificate covering both `example.com` and `*.example.com`
+ * produces two DNS-01 challenges on the same `_acme-challenge.example.com`
+ * name, and both tokens must be live at once. Two is what ACME needs; the cap
+ * keeps a vendor's own records bounded.
+ */
+const MAX_RECORDS_PER_VENDOR = 2;
+
+/**
  * Ownership marker stored in a record's `comment` field, e.g.
  * `acme-dns:vendor=lav5`.
  *
@@ -159,23 +169,30 @@ export class CloudflareDnsService {
   }
 
   /**
-   * Find the record owned by `vendor` for a challenge name, if any.
+   * Records owned by `vendor` for a challenge name, oldest first.
    */
-  private async findOwnedRecord(
+  private async findOwnedRecords(
     name: string,
     vendor: string,
-  ): Promise<CfDnsRecord | undefined> {
+  ): Promise<CfDnsRecord[]> {
     const marker = vendorComment(vendor);
     const existing = await this.listTxtRecords(name);
-    return existing.find((r) => r.comment === marker);
+    return existing
+      .filter((r) => r.comment === marker)
+      .sort((a, b) => (a.created_on ?? "").localeCompare(b.created_on ?? ""));
   }
 
   /**
-   * Upsert this vendor's TXT record for an ACME challenge.
+   * Upsert one of this vendor's TXT records for an ACME challenge.
    *
-   * The vendor's own record is reused if it already exists, so repeated
-   * validations do not grow the RRset. Records belonging to other vendors, and
-   * untagged records, are left untouched.
+   * A vendor may hold up to `MAX_RECORDS_PER_VENDOR` live tokens at once, so a
+   * base + wildcard issuance can validate both challenges concurrently. Below
+   * that cap a new record is added rather than an existing one rewritten,
+   * because an existing token may still be awaiting validation. At the cap the
+   * vendor's oldest record is recycled.
+   *
+   * Records belonging to other vendors, and untagged records, are never read
+   * as ours and never modified.
    */
   async upsertAcmeChallenge(
     domain: string,
@@ -185,35 +202,35 @@ export class CloudflareDnsService {
     const name = `_acme-challenge.${domain}`;
     const marker = vendorComment(vendor);
 
-    const owned = await this.findOwnedRecord(name, vendor);
+    const owned = await this.findOwnedRecords(name, vendor);
 
-    if (!owned) {
+    const alreadySet = owned.find((r) => r.content === txt);
+    if (alreadySet) {
+      return alreadySet;
+    }
+
+    if (owned.length < MAX_RECORDS_PER_VENDOR) {
       return this.createTxtRecord(name, txt, marker);
     }
 
-    if (owned.content === txt) {
-      // Already set to the same value
-      return owned;
-    }
-
-    return this.updateTxtRecord(owned.id, name, txt, marker);
+    return this.updateTxtRecord(owned[0].id, name, txt, marker);
   }
 
   /**
-   * Delete this vendor's TXT record for an ACME challenge.
+   * Delete every TXT record this vendor owns for an ACME challenge.
    *
-   * Returns whether a record was actually removed, so a cleanup that finds
-   * nothing to do is a success rather than an error.
+   * A vendor can hold more than one live token (base + wildcard), so cleanup
+   * removes all of them. Returns how many were removed, so a cleanup that
+   * finds nothing to do is a success rather than an error.
    */
-  async deleteAcmeChallenge(domain: string, vendor: string): Promise<boolean> {
+  async deleteAcmeChallenge(domain: string, vendor: string): Promise<number> {
     const name = `_acme-challenge.${domain}`;
 
-    const owned = await this.findOwnedRecord(name, vendor);
-    if (!owned) {
-      return false;
+    const owned = await this.findOwnedRecords(name, vendor);
+    for (const record of owned) {
+      await this.deleteTxtRecord(record.id);
     }
 
-    await this.deleteTxtRecord(owned.id);
-    return true;
+    return owned.length;
   }
 }

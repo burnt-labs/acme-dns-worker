@@ -33,7 +33,13 @@ export const CleanupRequestSchema = z.object({
 export const CleanupResponseSchema = z.object({
   deleted: z
     .boolean()
-    .describe("Whether a record was removed; false when there was none"),
+    .describe("Whether anything was removed; false when there was nothing"),
+  count: z
+    .number()
+    .int()
+    .describe(
+      "How many records were removed (a vendor may hold base + wildcard)",
+    ),
   vendor: z.string().describe("Vendor name associated with the API key"),
 });
 
@@ -61,6 +67,8 @@ export interface CfDnsRecord {
   ttl: number;
   /** Ownership marker; see `vendorComment` in the DNS service. */
   comment?: string | null;
+  /** Creation timestamp, used to recycle a vendor's oldest record first. */
+  created_on?: string;
 }
 
 /** Cloudflare API list response wrapper. */

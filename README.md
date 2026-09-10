@@ -6,11 +6,11 @@ Instead of running a custom DNS server, this worker creates/updates `_acme-chall
 
 ## Record ownership
 
-Each vendor owns at most one TXT record per challenge name. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
+Each vendor owns its own TXT records on a challenge name - up to two at a time, which is what a base + wildcard issuance needs, since `example.com` and `*.example.com` both validate against `_acme-challenge.example.com` and both tokens must be live at once. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
 
 This is what makes concurrent validation safe. A TXT RRset holds many values and ACME matches on any one of them, so several vendors can validate the same domain at the same time, each holding its own record, without destroying each other's in-flight token. Records with no recognised marker are never modified.
 
-Vendors are expected to call `/cleanup` when a validation finishes; without it, each vendor's record simply persists and is reused by its next renewal.
+Vendors are expected to call `/cleanup` when a validation finishes; without it a vendor's records persist and are recycled by its later renewals, oldest first.
 
 ## API
 
@@ -57,7 +57,7 @@ Set the ACME DNS-01 challenge TXT record for a domain.
 
 ### `POST /cleanup`
 
-Remove the calling vendor's ACME DNS-01 challenge TXT record.
+Remove every ACME DNS-01 challenge TXT record the calling vendor owns for a name (up to two, for base + wildcard).
 
 **Headers:**
 
@@ -73,7 +73,7 @@ Remove the calling vendor's ACME DNS-01 challenge TXT record.
 }
 ```
 
-Deleting a record that does not exist is a success (`deleted: false`), so cleanup hooks are idempotent and safe to retry.
+The response reports `count`, how many records were removed. Removing nothing is a success (`deleted: false`, `count: 0`), so cleanup hooks are idempotent and safe to retry.
 
 **Responses:**
 

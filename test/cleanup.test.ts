@@ -65,7 +65,7 @@ function postCleanup(
 describe("POST /cleanup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDeleteAcmeChallenge.mockResolvedValue(true);
+    mockDeleteAcmeChallenge.mockResolvedValue(1);
   });
 
   it("returns 401 without API key", async () => {
@@ -98,8 +98,12 @@ describe("POST /cleanup", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json<{ deleted: boolean; vendor: string }>();
-    expect(body).toEqual({ deleted: true, vendor: "vendor-alpha" });
+    const body = await res.json<{
+      deleted: boolean;
+      count: number;
+      vendor: string;
+    }>();
+    expect(body).toEqual({ deleted: true, count: 1, vendor: "vendor-alpha" });
     expect(mockDeleteAcmeChallenge).toHaveBeenCalledWith(
       "rpc.xion-testnet-2.burnt.com",
       "vendor-alpha",
@@ -107,15 +111,29 @@ describe("POST /cleanup", () => {
   });
 
   it("is idempotent when there is nothing to delete", async () => {
-    mockDeleteAcmeChallenge.mockResolvedValue(false);
+    mockDeleteAcmeChallenge.mockResolvedValue(0);
     const app = buildApp();
     const res = await postCleanup(app, {
       subdomain: "rpc.xion-testnet-2.burnt.com",
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json<{ deleted: boolean }>();
+    const body = await res.json<{ deleted: boolean; count: number }>();
     expect(body.deleted).toBe(false);
+    expect(body.count).toBe(0);
+  });
+
+  it("reports both records when the vendor held base + wildcard", async () => {
+    mockDeleteAcmeChallenge.mockResolvedValue(2);
+    const app = buildApp();
+    const res = await postCleanup(app, {
+      subdomain: "rpc.xion-testnet-2.burnt.com",
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ deleted: boolean; count: number }>();
+    expect(body.deleted).toBe(true);
+    expect(body.count).toBe(2);
   });
 
   it("scopes the delete to the calling vendor", async () => {

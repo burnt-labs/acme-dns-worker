@@ -27,7 +27,12 @@ function cfOkList<T>(result: T[]) {
 const ALPHA = vendorComment("alpha");
 const BETA = vendorComment("beta");
 
-function rec(id: string, content: string, comment?: string) {
+function rec(
+  id: string,
+  content: string,
+  comment?: string,
+  created_on = "2026-01-01T00:00:00Z",
+) {
   return {
     id,
     type: "TXT",
@@ -35,6 +40,7 @@ function rec(id: string, content: string, comment?: string) {
     content,
     ttl: 120,
     comment: comment ?? null,
+    created_on,
   };
 }
 
@@ -104,21 +110,50 @@ describe("CloudflareDnsService", () => {
       expect(body.comment).toBe(ALPHA);
     });
 
-    it("reuses the vendor's own record instead of growing the RRset", async () => {
-      mockFetch.mockResolvedValueOnce(cfOkList([rec("r1", "old", ALPHA)]));
-      const updated = rec("r1", "new", ALPHA);
-      mockFetch.mockResolvedValueOnce(cfOk(updated));
+    it("adds a second record so base and wildcard validate together", async () => {
+      // Issuing for example.com + *.example.com puts two challenges on the
+      // same name; both tokens must be live at once, so the first must not be
+      // rewritten while it is still awaiting validation.
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([rec("r1", "base-token", ALPHA)]),
+      );
+      const created = rec("r2", "wildcard-token", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOk(created));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "new", "alpha");
+      const result = await dns.upsertAcmeChallenge(
+        "test.com",
+        "wildcard-token",
+        "alpha",
+      );
 
-      expect(result).toEqual(updated);
-      const putCall = mockFetch.mock.calls[1];
-      expect(putCall[1].method).toBe("PUT");
-      expect(putCall[0]).toContain("/dns_records/r1");
-      expect(JSON.parse(putCall[1].body).comment).toBe(ALPHA);
+      expect(result).toEqual(created);
+      expect(mockFetch.mock.calls[1][1].method).toBe("POST");
+      // The in-flight base token was not rewritten
+      expect(String(mockFetch.mock.calls[1][0])).not.toContain(
+        "/dns_records/r1",
+      );
     });
 
-    it("is a no-op when the vendor's record already holds the value", async () => {
+    it("recycles its oldest record once at capacity", async () => {
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([
+          rec("r-new", "newer", ALPHA, "2026-02-02T00:00:00Z"),
+          rec("r-old", "older", ALPHA, "2026-01-01T00:00:00Z"),
+        ]),
+      );
+      const updated = rec("r-old", "third", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOk(updated));
+
+      await dns.upsertAcmeChallenge("test.com", "third", "alpha");
+
+      const putCall = mockFetch.mock.calls[1];
+      expect(putCall[1].method).toBe("PUT");
+      // Oldest by created_on, regardless of the order the API returned them
+      expect(putCall[0]).toContain("/dns_records/r-old");
+      expect(putCall[0]).not.toContain("/dns_records/r-new");
+    });
+
+    it("is a no-op when the vendor already holds the value", async () => {
       const existing = rec("r1", "same", ALPHA);
       mockFetch.mockResolvedValueOnce(cfOkList([existing]));
 
@@ -129,9 +164,9 @@ describe("CloudflareDnsService", () => {
     });
 
     it("leaves another vendor's in-flight record untouched", async () => {
-      // The regression: two vendors validating the same domain concurrently.
-      // beta already holds a live token; alpha must add its own record rather
-      // than overwrite beta's.
+      // The regression this fix targets: two vendors validating the same domain
+      // concurrently. beta holds a live token; alpha must add its own record
+      // rather than overwrite beta's.
       mockFetch.mockResolvedValueOnce(
         cfOkList([rec("r1", "beta-token", BETA)]),
       );
@@ -146,22 +181,23 @@ describe("CloudflareDnsService", () => {
 
       expect(result).toEqual(created);
       expect(mockFetch.mock.calls[1][1].method).toBe("POST");
-      // Nothing addressed beta's record
       for (const [url, opts] of mockFetch.mock.calls) {
         expect(String(url)).not.toContain("/dns_records/r1");
         if (opts) expect(opts.method).not.toBe("DELETE");
       }
     });
 
-    it("picks its own record out of a crowded RRset", async () => {
-      // Mirrors the production state that caused DO-495: the RRset had grown
-      // to 5-6 records, so the old code fell into "overwrite whichever record
-      // differs" and every vendor wrote into the same slot.
+    it("picks its own records out of a crowded RRset", async () => {
+      // Mirrors the production state behind DO-495: the RRset had grown to 5-6
+      // records, so the old code fell into "overwrite whichever record differs"
+      // and every vendor wrote into the same slot. alpha is at capacity here,
+      // so it recycles its own oldest and touches nothing else.
       mockFetch.mockResolvedValueOnce(
         cfOkList([
           rec("r0", "legacy-token"),
           rec("r1", "beta-token", BETA),
-          rec("r2", "alpha-old", ALPHA),
+          rec("r2", "alpha-old", ALPHA, "2026-01-01T00:00:00Z"),
+          rec("r3", "alpha-newer", ALPHA, "2026-02-01T00:00:00Z"),
         ]),
       );
       const updated = rec("r2", "alpha-new", ALPHA);
@@ -177,9 +213,10 @@ describe("CloudflareDnsService", () => {
       const putCall = mockFetch.mock.calls[1];
       expect(putCall[1].method).toBe("PUT");
       expect(putCall[0]).toContain("/dns_records/r2");
-      // Neither the legacy record nor beta's live token was addressed
+      // Neither the legacy record, beta's live token, nor alpha's newer one
       expect(putCall[0]).not.toContain("/dns_records/r0");
       expect(putCall[0]).not.toContain("/dns_records/r1");
+      expect(putCall[0]).not.toContain("/dns_records/r3");
     });
 
     it("does not adopt an untagged legacy record", async () => {
@@ -197,22 +234,47 @@ describe("CloudflareDnsService", () => {
   });
 
   describe("deleteAcmeChallenge", () => {
-    it("deletes only the calling vendor's record", async () => {
+    it("deletes only the calling vendor's records", async () => {
       mockFetch.mockResolvedValueOnce(
         cfOkList([
           rec("r1", "alpha-token", ALPHA),
           rec("r2", "beta-token", BETA),
+          rec("r3", "legacy"),
         ]),
       );
       mockFetch.mockResolvedValueOnce(cfOk({}));
 
       const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
 
-      expect(removed).toBe(true);
+      expect(removed).toBe(1);
       const delCall = mockFetch.mock.calls[1];
       expect(delCall[1].method).toBe("DELETE");
       expect(delCall[0]).toContain("/dns_records/r1");
-      expect(delCall[0]).not.toContain("/dns_records/r2");
+      // beta's token and the untagged record survive
+      for (const [url] of mockFetch.mock.calls) {
+        expect(String(url)).not.toContain("/dns_records/r2");
+        expect(String(url)).not.toContain("/dns_records/r3");
+      }
+    });
+
+    it("removes both records when the vendor holds base + wildcard", async () => {
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([
+          rec("r1", "base-token", ALPHA, "2026-01-01T00:00:00Z"),
+          rec("r2", "wildcard-token", ALPHA, "2026-01-01T00:01:00Z"),
+          rec("r3", "beta-token", BETA),
+        ]),
+      );
+      mockFetch.mockResolvedValueOnce(cfOk({}));
+      mockFetch.mockResolvedValueOnce(cfOk({}));
+
+      const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
+
+      expect(removed).toBe(2);
+      const deleted = mockFetch.mock.calls
+        .slice(1)
+        .map(([url]) => String(url).split("/dns_records/")[1]);
+      expect(deleted.sort()).toEqual(["r1", "r2"]);
     });
 
     it("reports nothing removed when the vendor has no record", async () => {
@@ -222,8 +284,7 @@ describe("CloudflareDnsService", () => {
 
       const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
 
-      expect(removed).toBe(false);
-      // Only the list call - no DELETE issued
+      expect(removed).toBe(0);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -232,7 +293,7 @@ describe("CloudflareDnsService", () => {
 
       const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
 
-      expect(removed).toBe(false);
+      expect(removed).toBe(0);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });

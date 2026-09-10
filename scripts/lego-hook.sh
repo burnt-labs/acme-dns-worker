@@ -49,16 +49,26 @@ case "$EXEC_MODE" in
   cleanup)
     echo "Removing ACME challenge for ${EXEC_DOMAIN}..."
 
+    # Cleanup must never fail the run - issuance has already finished. `set -e`
+    # would abort on a transient curl error before the checks below, so the
+    # request runs with -e disabled and its status is inspected by hand.
+    set +e
     response=$(curl -s -w "\n%{http_code}" \
       -X POST "${ACME_DNS_WORKER_URL}/cleanup" \
       -H "Content-Type: application/json" \
       -H "X-Api-Key: ${ACME_DNS_WORKER_API_KEY}" \
       -d "{\"subdomain\": \"${EXEC_DOMAIN}\"}")
+    curl_status=$?
+    set -e
+
+    if [ "$curl_status" -ne 0 ]; then
+      echo "Warning: cleanup request failed (curl exit ${curl_status})" >&2
+      exit 0
+    fi
 
     http_code=$(echo "$response" | tail -1)
     body=$(echo "$response" | head -1)
 
-    # Never fail the run on cleanup - issuance has already finished by now.
     if [ "$http_code" != "200" ]; then
       echo "Warning: cleanup failed with HTTP ${http_code} — ${body}" >&2
       exit 0
