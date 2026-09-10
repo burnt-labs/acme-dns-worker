@@ -6,11 +6,20 @@ import type {
 
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
-/** Prefix for the `comment` field used to tag record ownership. */
-const COMMENT_PREFIX = "acme-dns-worker:vendor=";
+/**
+ * Prefix for the `comment` field used to tag record ownership.
+ *
+ * This is the tag format already present in the zone, written by an earlier
+ * version of the worker: records created before the comment was dropped still
+ * carry `acme-dns:vendor=<name>`. Keeping the format means those records are
+ * adopted by their owning vendor on the next renewal rather than orphaned
+ * alongside a freshly created duplicate.
+ */
+const COMMENT_PREFIX = "acme-dns:vendor=";
 
 /**
- * Ownership marker stored in a record's `comment` field.
+ * Ownership marker stored in a record's `comment` field, e.g.
+ * `acme-dns:vendor=lav5`.
  *
  * Each vendor owns at most one TXT record per challenge name, and only ever
  * rewrites or deletes the record carrying its own marker. That is what makes

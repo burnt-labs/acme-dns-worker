@@ -6,7 +6,7 @@ Instead of running a custom DNS server, this worker creates/updates `_acme-chall
 
 ## Record ownership
 
-Each vendor owns at most one TXT record per challenge name. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns-worker:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
+Each vendor owns at most one TXT record per challenge name. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
 
 This is what makes concurrent validation safe. A TXT RRset holds many values and ACME matches on any one of them, so several vendors can validate the same domain at the same time, each holding its own record, without destroying each other's in-flight token. Records with no recognised marker are never modified.
 

@@ -38,6 +38,15 @@ function rec(id: string, content: string, comment?: string) {
   };
 }
 
+describe("vendorComment", () => {
+  it("matches the tag format already written in the zone", () => {
+    // Records predating the comment being dropped carry this exact format;
+    // changing it would orphan them instead of adopting them.
+    expect(vendorComment("lav5")).toBe("acme-dns:vendor=lav5");
+    expect(vendorComment("itrocket")).toBe("acme-dns:vendor=itrocket");
+  });
+});
+
 describe("CloudflareDnsService", () => {
   let dns: CloudflareDnsService;
 
