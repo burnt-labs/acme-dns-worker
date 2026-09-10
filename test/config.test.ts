@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseApiKeys } from "../src/config.js";
+import { parseApiKeys, isDomainAllowed } from "../src/config.js";
 
 describe("parseApiKeys", () => {
   it("parses JSON key→vendor-config map", () => {
@@ -47,5 +47,23 @@ describe("parseApiKeys", () => {
     expect(() =>
       parseApiKeys('{"key1":{"name":"v","domains":"a.com"}}'),
     ).toThrow(/domains must be an array/);
+  });
+});
+
+describe("isDomainAllowed", () => {
+  const vendor = { name: "lav5", domains: ["api.example.com"] };
+
+  it("allows a domain on the vendor's list", () => {
+    expect(isDomainAllowed(vendor, "api.example.com")).toBe(true);
+  });
+
+  it("rejects a domain the vendor does not hold", () => {
+    expect(isDomainAllowed(vendor, "rpc.example.com")).toBe(false);
+  });
+
+  it("rejects everything when there is no vendor config", () => {
+    // Defensive: auth middleware should always set one, but a missing config
+    // must fail closed rather than allow the write.
+    expect(isDomainAllowed(undefined, "api.example.com")).toBe(false);
   });
 });
