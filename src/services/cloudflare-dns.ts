@@ -6,6 +6,26 @@ import type {
 
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
+/** Prefix for the `comment` field used to tag record ownership. */
+const COMMENT_PREFIX = "acme-dns-worker:vendor=";
+
+/**
+ * Ownership marker stored in a record's `comment` field.
+ *
+ * Each vendor owns at most one TXT record per challenge name, and only ever
+ * rewrites or deletes the record carrying its own marker. That is what makes
+ * concurrent validation safe: two vendors validating the same domain at the
+ * same time each hold their own record, so neither can destroy the other's
+ * in-flight token. A TXT RRset holds many values, and ACME matches on any one
+ * of them, so both validations succeed.
+ *
+ * Records without a recognised marker are never touched — they predate this
+ * scheme and are left for the prune tooling to remove.
+ */
+export function vendorComment(vendor: string): string {
+  return `${COMMENT_PREFIX}${vendor}`;
+}
+
 /**
  * Minimal Cloudflare DNS API client scoped to a single zone.
  */
@@ -51,6 +71,7 @@ export class CloudflareDnsService {
   async createTxtRecord(
     name: string,
     content: string,
+    comment?: string,
     ttl = 120,
   ): Promise<CfDnsRecord> {
     const url = `${CF_API_BASE}/zones/${this.zoneId}/dns_records`;
@@ -58,7 +79,7 @@ export class CloudflareDnsService {
     const res = await fetch(url, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({ type: "TXT", name, content, ttl }),
+      body: JSON.stringify({ type: "TXT", name, content, ttl, comment }),
     });
 
     if (!res.ok) {
@@ -83,6 +104,7 @@ export class CloudflareDnsService {
     recordId: string,
     name: string,
     content: string,
+    comment?: string,
     ttl = 120,
   ): Promise<CfDnsRecord> {
     const url = `${CF_API_BASE}/zones/${this.zoneId}/dns_records/${recordId}`;
@@ -90,7 +112,7 @@ export class CloudflareDnsService {
     const res = await fetch(url, {
       method: "PUT",
       headers: this.headers(),
-      body: JSON.stringify({ type: "TXT", name, content, ttl }),
+      body: JSON.stringify({ type: "TXT", name, content, ttl, comment }),
     });
 
     if (!res.ok) {
@@ -128,35 +150,61 @@ export class CloudflareDnsService {
   }
 
   /**
-   * Upsert a TXT record for an ACME challenge.
-   *
-   * Follows acme-dns semantics: keeps up to 2 TXT records for the same name
-   * to support simultaneous base + wildcard validation. If there are already 2,
-   * the oldest one is replaced.
+   * Find the record owned by `vendor` for a challenge name, if any.
    */
-  async upsertAcmeChallenge(domain: string, txt: string): Promise<CfDnsRecord> {
+  private async findOwnedRecord(
+    name: string,
+    vendor: string,
+  ): Promise<CfDnsRecord | undefined> {
+    const marker = vendorComment(vendor);
+    const existing = await this.listTxtRecords(name);
+    return existing.find((r) => r.comment === marker);
+  }
+
+  /**
+   * Upsert this vendor's TXT record for an ACME challenge.
+   *
+   * The vendor's own record is reused if it already exists, so repeated
+   * validations do not grow the RRset. Records belonging to other vendors, and
+   * untagged records, are left untouched.
+   */
+  async upsertAcmeChallenge(
+    domain: string,
+    txt: string,
+    vendor: string,
+  ): Promise<CfDnsRecord> {
+    const name = `_acme-challenge.${domain}`;
+    const marker = vendorComment(vendor);
+
+    const owned = await this.findOwnedRecord(name, vendor);
+
+    if (!owned) {
+      return this.createTxtRecord(name, txt, marker);
+    }
+
+    if (owned.content === txt) {
+      // Already set to the same value
+      return owned;
+    }
+
+    return this.updateTxtRecord(owned.id, name, txt, marker);
+  }
+
+  /**
+   * Delete this vendor's TXT record for an ACME challenge.
+   *
+   * Returns whether a record was actually removed, so a cleanup that finds
+   * nothing to do is a success rather than an error.
+   */
+  async deleteAcmeChallenge(domain: string, vendor: string): Promise<boolean> {
     const name = `_acme-challenge.${domain}`;
 
-    const existing = await this.listTxtRecords(name);
-
-    if (existing.length === 0) {
-      // No records yet — create one
-      return this.createTxtRecord(name, txt);
+    const owned = await this.findOwnedRecord(name, vendor);
+    if (!owned) {
+      return false;
     }
 
-    if (existing.length === 1) {
-      if (existing[0].content === txt) {
-        // Already set to the same value
-        return existing[0];
-      }
-      // Create a second record (for wildcard + base domain support)
-      return this.createTxtRecord(name, txt);
-    }
-
-    // 2+ records exist — replace the oldest (first in list, assuming default ordering)
-    // or find one that's not equal to the new value
-    const target = existing.find((r) => r.content !== txt) ?? existing[0];
-
-    return this.updateTxtRecord(target.id, name, txt);
+    await this.deleteTxtRecord(owned.id);
+    return true;
   }
 }

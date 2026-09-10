@@ -4,6 +4,14 @@ Cloudflare Worker that provides an [acme-dns](https://github.com/joohoi/acme-dns
 
 Instead of running a custom DNS server, this worker creates/updates `_acme-challenge.<domain>` TXT records through Cloudflare's API. Domains are restricted to a configurable allow-list.
 
+## Record ownership
+
+Each vendor owns at most one TXT record per challenge name. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns-worker:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
+
+This is what makes concurrent validation safe. A TXT RRset holds many values and ACME matches on any one of them, so several vendors can validate the same domain at the same time, each holding its own record, without destroying each other's in-flight token. Records with no recognised marker are never modified.
+
+Vendors are expected to call `/cleanup` when a validation finishes; without it, each vendor's record simply persists and is reused by its next renewal.
+
 ## API
 
 ### `GET /health`
@@ -46,6 +54,36 @@ Set the ACME DNS-01 challenge TXT record for a domain.
 | 401    | Missing or invalid API key |
 | 403    | Domain not in allow-list   |
 | 502    | Cloudflare DNS API error   |
+
+### `POST /cleanup`
+
+Remove the calling vendor's ACME DNS-01 challenge TXT record.
+
+**Headers:**
+
+| Header      | Required | Description        |
+| ----------- | -------- | ------------------ |
+| `X-Api-Key` | Yes      | Pre-shared API key |
+
+**Body (JSON):**
+
+```json
+{
+  "subdomain": "app.example.com"
+}
+```
+
+Deleting a record that does not exist is a success (`deleted: false`), so cleanup hooks are idempotent and safe to retry.
+
+**Responses:**
+
+| Status | Description                                    |
+| ------ | ---------------------------------------------- |
+| 200    | Record removed, or there was nothing to remove |
+| 400    | Invalid request body                           |
+| 401    | Missing or invalid API key                     |
+| 403    | Domain not in allow-list                       |
+| 502    | Cloudflare DNS API error                       |
 
 ## Setup
 

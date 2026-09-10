@@ -47,7 +47,24 @@ case "$EXEC_MODE" in
     ;;
 
   cleanup)
-    echo "Cleanup: TXT records will be overwritten on next renewal."
+    echo "Removing ACME challenge for ${EXEC_DOMAIN}..."
+
+    response=$(curl -s -w "\n%{http_code}" \
+      -X POST "${ACME_DNS_WORKER_URL}/cleanup" \
+      -H "Content-Type: application/json" \
+      -H "X-Api-Key: ${ACME_DNS_WORKER_API_KEY}" \
+      -d "{\"subdomain\": \"${EXEC_DOMAIN}\"}")
+
+    http_code=$(echo "$response" | tail -1)
+    body=$(echo "$response" | head -1)
+
+    # Never fail the run on cleanup - issuance has already finished by now.
+    if [ "$http_code" != "200" ]; then
+      echo "Warning: cleanup failed with HTTP ${http_code} — ${body}" >&2
+      exit 0
+    fi
+
+    echo "Cleanup done: ${body}"
     ;;
 
   *)

@@ -52,7 +52,32 @@ dns_acme_dns_worker_add() {
 }
 
 dns_acme_dns_worker_rm() {
-  # Cleanup is optional — the TXT records get overwritten on the next update
-  echo "Cleanup: TXT records will be overwritten on next certificate renewal."
+  local fulldomain="$1"
+
+  # Strip _acme-challenge. prefix to get the base domain
+  local domain="${fulldomain#_acme-challenge.}"
+
+  echo "Removing TXT record for ${domain} via acme-dns-worker..."
+
+  local response
+  response=$(curl -s -w "\n%{http_code}" \
+    -X POST "${ACME_DNS_WORKER_URL}/cleanup" \
+    -H "Content-Type: application/json" \
+    -H "X-Api-Key: ${ACME_DNS_WORKER_API_KEY}" \
+    -d "{\"subdomain\": \"${domain}\"}")
+
+  local http_code
+  http_code=$(echo "$response" | tail -1)
+  local body
+  body=$(echo "$response" | head -1)
+
+  # Issuance has already finished by the time cleanup runs, so a failure here
+  # must not fail the certificate request.
+  if [ "$http_code" != "200" ]; then
+    echo "Warning: cleanup failed with HTTP ${http_code} — ${body}"
+    return 0
+  fi
+
+  echo "Cleanup done: ${body}"
   return 0
 }

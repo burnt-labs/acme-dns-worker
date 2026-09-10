@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CloudflareDnsService } from "../src/services/cloudflare-dns.js";
+import {
+  CloudflareDnsService,
+  vendorComment,
+} from "../src/services/cloudflare-dns.js";
 
 // ---------------------------------------------------------------------------
 // Mock global fetch
@@ -19,6 +22,20 @@ function cfOkList<T>(result: T[]) {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+const ALPHA = vendorComment("alpha");
+const BETA = vendorComment("beta");
+
+function rec(id: string, content: string, comment?: string) {
+  return {
+    id,
+    type: "TXT",
+    name: "_acme-challenge.test.com",
+    content,
+    ttl: 120,
+    comment: comment ?? null,
+  };
 }
 
 describe("CloudflareDnsService", () => {
@@ -61,106 +78,153 @@ describe("CloudflareDnsService", () => {
   });
 
   describe("upsertAcmeChallenge", () => {
-    it("creates a new record when none exist", async () => {
-      // First call: list → empty
+    it("creates a record tagged with the vendor when none exist", async () => {
       mockFetch.mockResolvedValueOnce(cfOkList([]));
-      // Second call: create
-      const created = {
-        id: "new-1",
-        type: "TXT",
-        name: "_acme-challenge.test.com",
-        content: "tok",
-        ttl: 120,
-      };
+      const created = rec("new-1", "tok", ALPHA);
       mockFetch.mockResolvedValueOnce(cfOk(created));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "tok");
+      const result = await dns.upsertAcmeChallenge("test.com", "tok", "alpha");
 
       expect(result).toEqual(created);
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      // Verify the POST body
       const createCall = mockFetch.mock.calls[1];
       expect(createCall[1].method).toBe("POST");
       const body = JSON.parse(createCall[1].body);
-      expect(body.type).toBe("TXT");
       expect(body.name).toBe("_acme-challenge.test.com");
       expect(body.content).toBe("tok");
+      expect(body.comment).toBe(ALPHA);
     });
 
-    it("creates a second record when only one exists", async () => {
-      const existing = [
-        {
-          id: "r1",
-          type: "TXT",
-          name: "_acme-challenge.test.com",
-          content: "old",
-          ttl: 120,
-        },
-      ];
-      mockFetch.mockResolvedValueOnce(cfOkList(existing));
-      const created = {
-        id: "r2",
-        type: "TXT",
-        name: "_acme-challenge.test.com",
-        content: "new",
-        ttl: 120,
-      };
-      mockFetch.mockResolvedValueOnce(cfOk(created));
-
-      const result = await dns.upsertAcmeChallenge("test.com", "new");
-
-      expect(result).toEqual(created);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(mockFetch.mock.calls[1][1].method).toBe("POST");
-    });
-
-    it("returns existing record when value already matches (1 record)", async () => {
-      const existing = [
-        {
-          id: "r1",
-          type: "TXT",
-          name: "_acme-challenge.test.com",
-          content: "same",
-          ttl: 120,
-        },
-      ];
-      mockFetch.mockResolvedValueOnce(cfOkList(existing));
-
-      const result = await dns.upsertAcmeChallenge("test.com", "same");
-
-      expect(result).toEqual(existing[0]);
-      // Only the list call was made
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    it("updates the differing record when 2 exist", async () => {
-      const existing = [
-        {
-          id: "r1",
-          type: "TXT",
-          name: "_acme-challenge.test.com",
-          content: "val-a",
-          ttl: 120,
-        },
-        {
-          id: "r2",
-          type: "TXT",
-          name: "_acme-challenge.test.com",
-          content: "val-b",
-          ttl: 120,
-        },
-      ];
-      mockFetch.mockResolvedValueOnce(cfOkList(existing));
-      const updated = { ...existing[0], content: "new-val" };
+    it("reuses the vendor's own record instead of growing the RRset", async () => {
+      mockFetch.mockResolvedValueOnce(cfOkList([rec("r1", "old", ALPHA)]));
+      const updated = rec("r1", "new", ALPHA);
       mockFetch.mockResolvedValueOnce(cfOk(updated));
 
-      const result = await dns.upsertAcmeChallenge("test.com", "new-val");
+      const result = await dns.upsertAcmeChallenge("test.com", "new", "alpha");
 
       expect(result).toEqual(updated);
-      // Should have PUT to r1 (first non-matching record)
       const putCall = mockFetch.mock.calls[1];
       expect(putCall[1].method).toBe("PUT");
       expect(putCall[0]).toContain("/dns_records/r1");
+      expect(JSON.parse(putCall[1].body).comment).toBe(ALPHA);
+    });
+
+    it("is a no-op when the vendor's record already holds the value", async () => {
+      const existing = rec("r1", "same", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOkList([existing]));
+
+      const result = await dns.upsertAcmeChallenge("test.com", "same", "alpha");
+
+      expect(result).toEqual(existing);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves another vendor's in-flight record untouched", async () => {
+      // The regression: two vendors validating the same domain concurrently.
+      // beta already holds a live token; alpha must add its own record rather
+      // than overwrite beta's.
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([rec("r1", "beta-token", BETA)]),
+      );
+      const created = rec("r2", "alpha-token", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOk(created));
+
+      const result = await dns.upsertAcmeChallenge(
+        "test.com",
+        "alpha-token",
+        "alpha",
+      );
+
+      expect(result).toEqual(created);
+      expect(mockFetch.mock.calls[1][1].method).toBe("POST");
+      // Nothing addressed beta's record
+      for (const [url, opts] of mockFetch.mock.calls) {
+        expect(String(url)).not.toContain("/dns_records/r1");
+        if (opts) expect(opts.method).not.toBe("DELETE");
+      }
+    });
+
+    it("picks its own record out of a crowded RRset", async () => {
+      // Mirrors the production state that caused DO-495: the RRset had grown
+      // to 5-6 records, so the old code fell into "overwrite whichever record
+      // differs" and every vendor wrote into the same slot.
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([
+          rec("r0", "legacy-token"),
+          rec("r1", "beta-token", BETA),
+          rec("r2", "alpha-old", ALPHA),
+        ]),
+      );
+      const updated = rec("r2", "alpha-new", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOk(updated));
+
+      const result = await dns.upsertAcmeChallenge(
+        "test.com",
+        "alpha-new",
+        "alpha",
+      );
+
+      expect(result).toEqual(updated);
+      const putCall = mockFetch.mock.calls[1];
+      expect(putCall[1].method).toBe("PUT");
+      expect(putCall[0]).toContain("/dns_records/r2");
+      // Neither the legacy record nor beta's live token was addressed
+      expect(putCall[0]).not.toContain("/dns_records/r0");
+      expect(putCall[0]).not.toContain("/dns_records/r1");
+    });
+
+    it("does not adopt an untagged legacy record", async () => {
+      mockFetch.mockResolvedValueOnce(cfOkList([rec("r1", "legacy")]));
+      const created = rec("r2", "tok", ALPHA);
+      mockFetch.mockResolvedValueOnce(cfOk(created));
+
+      await dns.upsertAcmeChallenge("test.com", "tok", "alpha");
+
+      expect(mockFetch.mock.calls[1][1].method).toBe("POST");
+      expect(String(mockFetch.mock.calls[1][0])).not.toContain(
+        "/dns_records/r1",
+      );
+    });
+  });
+
+  describe("deleteAcmeChallenge", () => {
+    it("deletes only the calling vendor's record", async () => {
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([
+          rec("r1", "alpha-token", ALPHA),
+          rec("r2", "beta-token", BETA),
+        ]),
+      );
+      mockFetch.mockResolvedValueOnce(cfOk({}));
+
+      const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
+
+      expect(removed).toBe(true);
+      const delCall = mockFetch.mock.calls[1];
+      expect(delCall[1].method).toBe("DELETE");
+      expect(delCall[0]).toContain("/dns_records/r1");
+      expect(delCall[0]).not.toContain("/dns_records/r2");
+    });
+
+    it("reports nothing removed when the vendor has no record", async () => {
+      mockFetch.mockResolvedValueOnce(
+        cfOkList([rec("r2", "beta-token", BETA)]),
+      );
+
+      const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
+
+      expect(removed).toBe(false);
+      // Only the list call - no DELETE issued
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports nothing removed for an empty RRset", async () => {
+      mockFetch.mockResolvedValueOnce(cfOkList([]));
+
+      const removed = await dns.deleteAcmeChallenge("test.com", "alpha");
+
+      expect(removed).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 });
