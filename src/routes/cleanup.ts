@@ -3,43 +3,45 @@ import { isDomainAllowed, type VendorConfig } from "../config.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { CloudflareDnsService } from "../services/cloudflare-dns.js";
 import {
-  UpdateRequestSchema,
-  UpdateResponseSchema,
+  CleanupRequestSchema,
+  CleanupResponseSchema,
   ErrorResponseSchema,
 } from "../types.js";
 
-type UpdateEnv = {
+type CleanupEnv = {
   Bindings: Cloudflare.Env;
   Variables: {
     vendor: VendorConfig;
   };
 };
 
-const updateRoute = createRoute({
+const cleanupRoute = createRoute({
   method: "post",
-  path: "/update",
+  path: "/cleanup",
   tags: ["ACME DNS"],
-  summary: "Update ACME DNS-01 challenge TXT record",
+  summary: "Remove this vendor's ACME DNS-01 challenge TXT record",
   description:
-    "Sets a `_acme-challenge.<subdomain>` TXT record via the Cloudflare DNS API. " +
-    "Supports up to 2 concurrent TXT records per domain for wildcard + base domain validation.",
+    "Deletes every `_acme-challenge.<subdomain>` TXT record owned by the calling " +
+    "vendor - a vendor may hold two at once for base + wildcard validation. " +
+    "Records belonging to other vendors are never touched. Removing nothing is " +
+    "a success, so cleanup hooks are idempotent.",
   security: [{ ApiKeyAuth: [] }],
   request: {
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: UpdateRequestSchema,
+          schema: CleanupRequestSchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "TXT record updated successfully",
+      description: "Record removed, or there was nothing to remove",
       content: {
         "application/json": {
-          schema: UpdateResponseSchema,
+          schema: CleanupResponseSchema,
         },
       },
     },
@@ -78,12 +80,12 @@ const updateRoute = createRoute({
   },
 });
 
-const updateRoutes = new OpenAPIHono<UpdateEnv>();
+const cleanupRoutes = new OpenAPIHono<CleanupEnv>();
 
-updateRoutes.use("/update", authMiddleware);
+cleanupRoutes.use("/cleanup", authMiddleware);
 
-updateRoutes.openapi(updateRoute, async (c) => {
-  const { subdomain, txt } = c.req.valid("json");
+cleanupRoutes.openapi(cleanupRoute, async (c) => {
+  const { subdomain } = c.req.valid("json");
 
   // --- check vendor domain allow-list ----------------------------------------
   const vendorConfig = c.get("vendor");
@@ -96,18 +98,21 @@ updateRoutes.openapi(updateRoute, async (c) => {
     );
   }
 
-  // --- upsert TXT record via Cloudflare API ----------------------------------
+  // --- delete this vendor's record via Cloudflare API -------------------------
   const dns = new CloudflareDnsService(c.env.CF_ZONE_ID, c.env.CF_API_TOKEN);
 
+  let count: number;
   try {
-    await dns.upsertAcmeChallenge(subdomain, txt, vendor);
+    count = await dns.deleteAcmeChallenge(subdomain, vendor);
   } catch (err) {
     console.error(`Cloudflare DNS API error (vendor=${vendor}):`, err);
-    return c.json({ error: "Failed to update DNS record" }, 502);
+    return c.json({ error: "Failed to delete DNS record" }, 502);
   }
 
-  console.log(`TXT record updated: domain=${subdomain} vendor=${vendor}`);
-  return c.json({ txt, vendor }, 200);
+  console.log(
+    `TXT record cleanup: domain=${subdomain} vendor=${vendor} removed=${count}`,
+  );
+  return c.json({ deleted: count > 0, count, vendor }, 200);
 });
 
-export default updateRoutes;
+export default cleanupRoutes;

@@ -4,6 +4,14 @@ Cloudflare Worker that provides an [acme-dns](https://github.com/joohoi/acme-dns
 
 Instead of running a custom DNS server, this worker creates/updates `_acme-challenge.<domain>` TXT records through Cloudflare's API. Domains are restricted to a configurable allow-list.
 
+## Record ownership
+
+Each vendor owns its own TXT records on a challenge name - up to two at a time, which is what a base + wildcard issuance needs, since `example.com` and `*.example.com` both validate against `_acme-challenge.example.com` and both tokens must be live at once. Ownership is recorded in the record's Cloudflare `comment` field as `acme-dns:vendor=<name>`, and a vendor only ever rewrites or deletes a record carrying its own marker.
+
+This is what makes concurrent validation safe. A TXT RRset holds many values and ACME matches on any one of them, so several vendors can validate the same domain at the same time, each holding its own record, without destroying each other's in-flight token. Records with no recognised marker are never modified.
+
+Vendors are expected to call `/cleanup` when a validation finishes; without it a vendor's records persist and are recycled by its later renewals, oldest first.
+
 ## API
 
 ### `GET /health`
@@ -46,6 +54,36 @@ Set the ACME DNS-01 challenge TXT record for a domain.
 | 401    | Missing or invalid API key |
 | 403    | Domain not in allow-list   |
 | 502    | Cloudflare DNS API error   |
+
+### `POST /cleanup`
+
+Remove every ACME DNS-01 challenge TXT record the calling vendor owns for a name (up to two, for base + wildcard).
+
+**Headers:**
+
+| Header      | Required | Description        |
+| ----------- | -------- | ------------------ |
+| `X-Api-Key` | Yes      | Pre-shared API key |
+
+**Body (JSON):**
+
+```json
+{
+  "subdomain": "app.example.com"
+}
+```
+
+The response reports `count`, how many records were removed. Removing nothing is a success (`deleted: false`, `count: 0`), so cleanup hooks are idempotent and safe to retry.
+
+**Responses:**
+
+| Status | Description                                    |
+| ------ | ---------------------------------------------- |
+| 200    | Record removed, or there was nothing to remove |
+| 400    | Invalid request body                           |
+| 401    | Missing or invalid API key                     |
+| 403    | Domain not in allow-list                       |
+| 502    | Cloudflare DNS API error                       |
 
 ## Setup
 

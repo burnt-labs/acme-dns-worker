@@ -22,6 +22,27 @@ export const UpdateResponseSchema = z.object({
   vendor: z.string().describe("Vendor name associated with the API key"),
 });
 
+export const CleanupRequestSchema = z.object({
+  subdomain: z
+    .string()
+    .min(1, "subdomain is required")
+    .describe("FQDN whose challenge record should be removed")
+    .transform((v) => v.toLowerCase()),
+});
+
+export const CleanupResponseSchema = z.object({
+  deleted: z
+    .boolean()
+    .describe("Whether anything was removed; false when there was nothing"),
+  count: z
+    .number()
+    .int()
+    .describe(
+      "How many records were removed (a vendor may hold base + wildcard)",
+    ),
+  vendor: z.string().describe("Vendor name associated with the API key"),
+});
+
 export const HealthResponseSchema = z.object({
   status: z.literal("ok"),
 });
@@ -32,6 +53,8 @@ export const ErrorResponseSchema = z.object({
 
 export type UpdateRequest = z.infer<typeof UpdateRequestSchema>;
 export type UpdateResponse = z.infer<typeof UpdateResponseSchema>;
+export type CleanupRequest = z.infer<typeof CleanupRequestSchema>;
+export type CleanupResponse = z.infer<typeof CleanupResponseSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
@@ -42,6 +65,10 @@ export interface CfDnsRecord {
   name: string;
   content: string;
   ttl: number;
+  /** Ownership marker; see `vendorComment` in the DNS service. */
+  comment?: string | null;
+  /** Creation timestamp, used to recycle a vendor's oldest record first. */
+  created_on?: string;
 }
 
 /** Cloudflare API list response wrapper. */

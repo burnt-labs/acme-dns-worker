@@ -144,6 +144,7 @@ describe("POST /update", () => {
     expect(mockUpsertAcmeChallenge).toHaveBeenCalledWith(
       "rpc.xion-testnet-2.burnt.com",
       "LHDhK3oGRvkiefQnx7OOczTY5Tic_xZ6HcMOc_gmtoM",
+      "vendor-alpha",
     );
   });
 

@@ -53,3 +53,17 @@ export function parseApiKeys(raw: string): ApiKeyMap {
 
   return map as unknown as ApiKeyMap;
 }
+
+/**
+ * Whether a vendor may manage the challenge record for `subdomain`.
+ *
+ * Matching is exact against the vendor's configured domains, which are
+ * normalised to lowercase by `parseApiKeys`; request schemas lowercase the
+ * incoming subdomain to match.
+ */
+export function isDomainAllowed(
+  vendor: VendorConfig | undefined,
+  subdomain: string,
+): boolean {
+  return vendor?.domains.includes(subdomain) ?? false;
+}
