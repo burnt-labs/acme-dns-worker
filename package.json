@@ -25,7 +25,7 @@
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.5.2",
-    "hono": "^4.13.1",
+    "hono": "^4.13.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
