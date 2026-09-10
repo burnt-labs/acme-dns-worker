@@ -298,3 +298,124 @@ describe("CloudflareDnsService", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cloudflare API failure paths. These are the branches that decide whether a
+// renewal fails loudly or silently corrupts the RRset, so they are worth
+// pinning: every wrapper must throw rather than return a partial result.
+// ---------------------------------------------------------------------------
+function cfHttpError(status = 500) {
+  return new Response("upstream exploded", { status });
+}
+
+function cfNotSuccess() {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      errors: [{ code: 10000, message: "Authentication error" }],
+      result: null,
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+describe("CloudflareDnsService API failures", () => {
+  let dns: CloudflareDnsService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dns = new CloudflareDnsService("zone-123", "token-abc");
+  });
+
+  it("listTxtRecords throws on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce(cfHttpError(502));
+    await expect(
+      dns.listTxtRecords("_acme-challenge.test.com"),
+    ).rejects.toThrow(/error listing records: 502/);
+  });
+
+  it("listTxtRecords throws when the API reports failure", async () => {
+    mockFetch.mockResolvedValueOnce(cfNotSuccess());
+    await expect(
+      dns.listTxtRecords("_acme-challenge.test.com"),
+    ).rejects.toThrow(/Authentication error/);
+  });
+
+  it("createTxtRecord throws on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce(cfHttpError(429));
+    await expect(
+      dns.createTxtRecord("_acme-challenge.test.com", "tok", ALPHA),
+    ).rejects.toThrow(/error creating record: 429/);
+  });
+
+  it("createTxtRecord throws when the API reports failure", async () => {
+    mockFetch.mockResolvedValueOnce(cfNotSuccess());
+    await expect(
+      dns.createTxtRecord("_acme-challenge.test.com", "tok", ALPHA),
+    ).rejects.toThrow(/Authentication error/);
+  });
+
+  it("updateTxtRecord throws on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce(cfHttpError(500));
+    await expect(
+      dns.updateTxtRecord("r1", "_acme-challenge.test.com", "tok", ALPHA),
+    ).rejects.toThrow(/error updating record: 500/);
+  });
+
+  it("updateTxtRecord throws when the API reports failure", async () => {
+    mockFetch.mockResolvedValueOnce(cfNotSuccess());
+    await expect(
+      dns.updateTxtRecord("r1", "_acme-challenge.test.com", "tok", ALPHA),
+    ).rejects.toThrow(/Authentication error/);
+  });
+
+  it("deleteTxtRecord throws on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce(cfHttpError(403));
+    await expect(dns.deleteTxtRecord("r1")).rejects.toThrow(
+      /error deleting record: 403/,
+    );
+  });
+
+  it("a failed list aborts the upsert instead of creating a duplicate", async () => {
+    // If listing fails and we pressed on, we would create a second record
+    // while the vendor already owns one - the growth that caused DO-495.
+    mockFetch.mockResolvedValueOnce(cfHttpError(500));
+    await expect(
+      dns.upsertAcmeChallenge("test.com", "tok", "alpha"),
+    ).rejects.toThrow(/error listing records/);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("orders records that carry no created_on without throwing", async () => {
+    // Cloudflare omits created_on on some responses; the sort must still be
+    // total, and a record with no timestamp counts as oldest.
+    mockFetch.mockResolvedValueOnce(
+      cfOkList([
+        {
+          id: "r-dated",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "dated",
+          ttl: 120,
+          comment: ALPHA,
+          created_on: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "r-undated",
+          type: "TXT",
+          name: "_acme-challenge.test.com",
+          content: "undated",
+          ttl: 120,
+          comment: ALPHA,
+        },
+      ]),
+    );
+    mockFetch.mockResolvedValueOnce(cfOk({ id: "r-undated" }));
+
+    await dns.upsertAcmeChallenge("test.com", "third", "alpha");
+
+    const putCall = mockFetch.mock.calls[1];
+    expect(putCall[1].method).toBe("PUT");
+    expect(putCall[0]).toContain("/dns_records/r-undated");
+  });
+});
