@@ -31,8 +31,8 @@ const MAX_RECORDS_PER_VENDOR = 2;
  * Ownership marker stored in a record's `comment` field, e.g.
  * `acme-dns:vendor=lav5`.
  *
- * Each vendor owns at most one TXT record per challenge name, and only ever
- * rewrites or deletes the record carrying its own marker. That is what makes
+ * Each vendor owns at most `MAX_RECORDS_PER_VENDOR` TXT records per challenge name, and only ever
+ * rewrites or deletes the record(s) carrying its own marker. That is what makes
  * concurrent validation safe: two vendors validating the same domain at the
  * same time each hold their own record, so neither can destroy the other's
  * in-flight token. A TXT RRset holds many values, and ACME matches on any one
